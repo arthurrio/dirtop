@@ -28,13 +28,13 @@ type Model struct {
 
 // Init dispara a primeira varredura imediatamente, sem esperar 1 segundo.
 func (m Model) Init() tea.Cmd {
-	return scanCmd()
+	return scanCmd(m.cwd)
 }
 
-// scanCmd retorna um tea.Cmd que executa a varredura e envia ScanMsg.
-func scanCmd() tea.Cmd {
+// scanCmd retorna um tea.Cmd que executa a varredura no path especificado.
+func scanCmd(path string) tea.Cmd {
 	return func() tea.Msg {
-		return ScanMsg(Scan("."))
+		return ScanMsg(Scan(path))
 	}
 }
 
@@ -49,7 +49,7 @@ func tickCmd() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tickMsg:
-		return m, scanCmd()
+		return m, scanCmd(m.cwd)
 
 	case ScanMsg:
 		stats := Stats(msg)
@@ -117,7 +117,16 @@ func (m Model) View() string {
 	sb.WriteString(StyleGray.Render(" HISTÓRICO"))
 	sb.WriteString("\n")
 
-	chartHeight := m.height - 10
+	// Calcular linhas de extensões (limitado ao espaço disponível)
+	extCount := len(m.current.ByExt)
+	extRows := (extCount + 1) / 2 // 2 colunas por linha
+	if extRows < 1 {
+		extRows = 1
+	}
+
+	// Overhead fixo: status(1) + metrics(1) + sep(1) + HISTÓRICO(1) + \n pós-chart(1) + sep(1) + EXTENSÕES(1) = 7
+	const fixedOverhead = 7
+	chartHeight := m.height - fixedOverhead - extRows
 	if chartHeight < 5 {
 		chartHeight = 5
 	}
@@ -171,7 +180,7 @@ func renderExtensions(byExt map[string]int, width int) string {
 		entries = append(entries, *noExt)
 	}
 
-	colWidth := width / 2
+	colWidth := (width - 1) / 2
 	const countWidth = 8
 
 	var sb strings.Builder
