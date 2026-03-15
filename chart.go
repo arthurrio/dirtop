@@ -187,17 +187,17 @@ func maxInt(vals []int) int {
 type ChartMode int
 
 const (
-	ChartBraille   ChartMode = iota // área preenchida (padrão)
+	ChartHorizBar  ChartMode = iota // histograma horizontal de blocos (padrão)
+	ChartBraille                    // área preenchida
 	ChartSparkline                  // apenas a linha, sem preenchimento
 	ChartMultiLine                  // três métricas sobrepostas
 	ChartDelta                      // variação (Δ) em relação ao ponto anterior
-	ChartHorizBar                   // histograma horizontal de blocos
 	chartModeCount
 )
 
 // Name retorna o nome legível do modo de gráfico.
 func (m ChartMode) Name() string {
-	names := [...]string{"area", "line", "multi", "delta", "bars"}
+	names := [...]string{"bars", "area", "line", "multi", "delta"}
 	if int(m) < len(names) {
 		return names[m]
 	}
