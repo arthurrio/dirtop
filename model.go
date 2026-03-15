@@ -203,7 +203,7 @@ func (m Model) View() string {
 	if m.chartMode == ChartMultiLine {
 		metricHint = "" // multi mode shows all three, hint does not apply
 	}
-	histLabel := fmt.Sprintf(" HISTORY  [c: %s]%s", m.chartMode.Name(), metricHint)
+	histLabel := fmt.Sprintf(" HISTORY  [c: %s]%s  [i: %s]", m.chartMode.Name(), metricHint, formatInterval(m.interval()))
 	sb.WriteString(StyleGray.Render(histLabel))
 	sb.WriteString("\n")
 
