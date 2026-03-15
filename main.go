@@ -13,10 +13,19 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+// version is set at build time via -ldflags "-X main.version=<tag>".
+var version = "dev"
+
 func main() {
+	flagVersion := flag.Bool("version", false, "print version and exit")
 	flagInterval := flag.Int("i", 0, "starting refresh interval in seconds (e.g. -i 5)")
 	flagIntervals := flag.String("intervals", "", "available intervals in seconds, comma-separated (e.g. --intervals 1,5,10,30,60)")
 	flag.Parse()
+
+	if *flagVersion {
+		fmt.Println("dirtop", version)
+		os.Exit(0)
+	}
 
 	// Verificar acesso ao diretório atual antes de iniciar a TUI
 	if _, err := os.ReadDir("."); err != nil {
