@@ -81,12 +81,14 @@ func Scan(path string) Stats {
 
 		// Detectar se é texto
 		if isTextFile(p) {
-			lines := countLines(p)
+			lines := countLines(ctx, p)
 			stats.Lines += lines
 			stats.ByExt[ext] += lines
 		} else {
 			// Arquivo binário: conta no mapa com 0 linhas (garante chave presente)
-			stats.ByExt[ext] += 0
+			if _, ok := stats.ByExt[ext]; !ok {
+				stats.ByExt[ext] = 0
+			}
 		}
 
 		return nil
@@ -119,7 +121,7 @@ func isTextFile(path string) bool {
 }
 
 // countLines conta o número de linhas de um arquivo texto.
-func countLines(path string) int {
+func countLines(ctx context.Context, path string) int {
 	f, err := os.Open(path)
 	if err != nil {
 		return 0
@@ -130,6 +132,14 @@ func countLines(path string) int {
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		count++
+		// Check timeout every 1000 lines to avoid blocking indefinitely
+		if count%1000 == 0 {
+			select {
+			case <-ctx.Done():
+				return count
+			default:
+			}
+		}
 	}
 	return count
 }

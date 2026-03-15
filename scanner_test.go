@@ -99,8 +99,11 @@ func TestScan_BinaryNotCountedInLines(t *testing.T) {
 	dir := createTestDir(t)
 	stats := Scan(dir)
 
-	// .bin deve aparecer em ByExt com 0 linhas (arquivo contado, linhas não)
-	if v, ok := stats.ByExt[".bin"]; ok && v != 0 {
+	v, ok := stats.ByExt[".bin"]
+	if !ok {
+		t.Error(".bin deve aparecer em ByExt mesmo sendo binário")
+	}
+	if v != 0 {
 		t.Errorf("binário não deve ter linhas, obtido %d", v)
 	}
 }
