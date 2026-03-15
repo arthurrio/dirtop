@@ -68,6 +68,37 @@ func TestRender_TruncatesLongHistory(t *testing.T) {
 	}
 }
 
+func TestRender_ContainsBrailleChars(t *testing.T) {
+	// A single non-zero value should produce at least one braille character
+	result := Render([]int{10}, 10, 5)
+	hasBraille := false
+	for _, r := range result {
+		if r >= 0x2800 && r <= 0x28FF {
+			hasBraille = true
+			break
+		}
+	}
+	if !hasBraille {
+		t.Error("esperado pelo menos um caractere braille (U+2800–U+28FF) na saída")
+	}
+}
+
+func TestRender_MinHeight(t *testing.T) {
+	// height=1 should be clamped to 2
+	result := Render([]int{5, 10}, 20, 1)
+	lines := strings.Split(result, "\n")
+	if len(lines) != 2 {
+		t.Errorf("height=1 deve produzir 2 linhas (mínimo), obtido %d", len(lines))
+	}
+
+	// height=2 should produce exactly 2 lines
+	result2 := Render([]int{5, 10}, 20, 2)
+	lines2 := strings.Split(result2, "\n")
+	if len(lines2) != 2 {
+		t.Errorf("height=2 deve produzir 2 linhas, obtido %d", len(lines2))
+	}
+}
+
 // stripANSI remove sequências de escape ANSI de uma string.
 func stripANSI(s string) string {
 	var result strings.Builder

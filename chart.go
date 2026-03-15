@@ -29,7 +29,8 @@ func Render(values []int, width, height int) string {
 	chartRows := height - 1 // linhas disponíveis para o gráfico braille
 
 	// Caso vazio ou todos zeros
-	if len(values) == 0 || maxInt(values) == 0 {
+	maxVal := maxInt(values)
+	if maxVal == 0 {
 		return blankBlock(width, height)
 	}
 
@@ -38,8 +39,6 @@ func Render(values []int, width, height int) string {
 	if len(values) > maxValues {
 		values = values[len(values)-maxValues:]
 	}
-
-	maxVal := maxInt(values)
 	totalDots := chartRows * 4 // pontos verticais disponíveis
 
 	// Normalizar valores para [0, totalDots]
@@ -77,14 +76,14 @@ func Render(values []int, width, height int) string {
 		// Acender pontos da base até o valor
 		for dotRow := 0; dotRow < leftVal; dotRow++ {
 			row := chartRows - 1 - dotRow/4
-			bit := dotRow % 4
+			bit := 3 - (dotRow % 4)
 			if row >= 0 && row < chartRows {
 				grid[row][colIdx] |= 1 << brailleLeft[bit]
 			}
 		}
 		for dotRow := 0; dotRow < rightVal; dotRow++ {
 			row := chartRows - 1 - dotRow/4
-			bit := dotRow % 4
+			bit := 3 - (dotRow % 4)
 			if row >= 0 && row < chartRows {
 				grid[row][colIdx] |= 1 << brailleRight[bit]
 			}
