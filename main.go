@@ -14,13 +14,13 @@ import (
 )
 
 func main() {
-	flagInterval := flag.Int("i", 0, "intervalo de atualização inicial em segundos (ex: -i 5)")
-	flagIntervals := flag.String("intervals", "", "lista de intervalos disponíveis em segundos, separados por vírgula (ex: --intervals 1,5,10,30,60)")
+	flagInterval := flag.Int("i", 0, "starting refresh interval in seconds (e.g. -i 5)")
+	flagIntervals := flag.String("intervals", "", "available intervals in seconds, comma-separated (e.g. --intervals 1,5,10,30,60)")
 	flag.Parse()
 
 	// Verificar acesso ao diretório atual antes de iniciar a TUI
 	if _, err := os.ReadDir("."); err != nil {
-		fmt.Fprintf(os.Stderr, "Erro: não foi possível acessar o diretório atual: %v\n", err)
+		fmt.Fprintf(os.Stderr, "error: cannot access current directory: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -43,7 +43,7 @@ func main() {
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "Erro ao executar: %v\n", err)
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
 }
@@ -62,7 +62,7 @@ func parseIntervals(rawList string, startSecs int) []time.Duration {
 			}
 			n, err := strconv.Atoi(part)
 			if err != nil || n <= 0 {
-				fmt.Fprintf(os.Stderr, "Aviso: intervalo inválido ignorado: %q\n", part)
+				fmt.Fprintf(os.Stderr, "warning: invalid interval ignored: %q\n", part)
 				continue
 			}
 			durations = append(durations, time.Duration(n)*time.Second)

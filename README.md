@@ -1,0 +1,114 @@
+# dirtop
+
+A real-time terminal dashboard for monitoring directories. Tracks file count, directory count, lines of code, and file extension breakdown — with a live history chart that updates as your codebase evolves.
+
+```
+ ▶ dirtop  [~/code/myproject]  ↺ 1s
+  files  312    │  dirs  47    │  lines  18,432
+────────────────────────────────────────────────────────────────────────────────
+ HISTORY  [c: area]  [m: lines]
+⣀⣀⣤⣤⣶⣶⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
+⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
+t=0s────────────────────────────────────────────────────────────────────now
+────────────────────────────────────────────────────────────────────────────────
+ EXTENSIONS
+ .go              12,104    .md               2,341
+ .json             2,891    .yaml               891
+ .sh                 205    (no ext)             --
+```
+
+## Features
+
+- **Real-time scanning** — refreshes every second (configurable)
+- **5 chart modes** — cycle through area, sparkline, multi-line, delta, and horizontal bar
+- **3 tracked metrics** — lines of code, file count, directory count
+- **Extension breakdown** — sorted by line count in a two-column grid
+- **Adaptive layout** — responds to terminal resize
+- **Configurable intervals** — set available refresh rates at startup
+
+## Installation
+
+### One-line install (Linux & macOS)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/arthurrio/dirtop/main/install.sh | bash
+```
+
+### Using Go
+
+Requires Go 1.21+.
+
+```bash
+go install github.com/arthurrio/dirtop@latest
+```
+
+### Build from source
+
+```bash
+git clone https://github.com/arthurrio/dirtop.git
+cd dirtop
+go build -o dirtop .
+sudo mv dirtop /usr/local/bin/
+```
+
+## Usage
+
+```
+dirtop [flags] [directory]
+```
+
+If no directory is given, the current working directory is used.
+
+### Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-i <seconds>` | `1` | Starting refresh interval |
+| `--intervals <list>` | `1,5,10,30,60` | Available intervals to cycle through (comma-separated, in seconds) |
+
+### Examples
+
+```bash
+# Monitor current directory
+dirtop
+
+# Monitor a specific path
+dirtop ~/code/myproject
+
+# Start with a 5-second interval
+dirtop -i 5
+
+# Use a custom interval list
+dirtop --intervals 1,10,60
+
+# Combine flags and path
+dirtop -i 10 --intervals 1,10,60 ~/code/myproject
+```
+
+## Keyboard shortcuts
+
+| Key | Action |
+|-----|--------|
+| `c` | Cycle chart mode (area → line → multi → delta → bars) |
+| `m` | Cycle active metric (lines → files → dirs) |
+| `i` | Cycle refresh interval |
+| `q` / `Ctrl+C` | Quit |
+
+## Chart modes
+
+| Mode | Description |
+|------|-------------|
+| `area` | Braille area chart with filled region (default) |
+| `line` | Braille sparkline — line only, no fill |
+| `multi` | Three overlaid sparklines: lines (purple), files (blue), dirs (green) |
+| `delta` | Change between samples — growth in green, decline in orange |
+| `bars` | Horizontal bar chart with time labels and values |
+
+## Requirements
+
+- A terminal with UTF-8 support and 256-color (or truecolor)
+- Terminal width of at least 40 columns and height of at least 10 rows
+
+## License
+
+[MIT](LICENSE)

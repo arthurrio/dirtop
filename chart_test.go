@@ -40,7 +40,7 @@ func TestRender_XAxisLabels(t *testing.T) {
 	if !strings.HasPrefix(lastLine, "t=0s") {
 		t.Errorf("última linha deve começar com 't=0s', obtido: %q", lastLine)
 	}
-	if !strings.HasSuffix(strings.TrimRight(lastLine, " "), "agora") {
+	if !strings.HasSuffix(strings.TrimRight(lastLine, " "), "now") {
 		t.Errorf("última linha deve terminar com 'agora', obtido: %q", lastLine)
 	}
 }

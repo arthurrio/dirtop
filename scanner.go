@@ -16,7 +16,7 @@ type Stats struct {
 	Files    int
 	Dirs     int
 	Lines    int
-	ByExt    map[string]int // ".go" → linhas; "(sem ext)" para sem extensão
+	ByExt    map[string]int // ".go" → linhas; "(no ext)" para sem extensão
 	Scanning bool           // true se varredura foi interrompida por timeout
 }
 
@@ -76,7 +76,7 @@ func Scan(path string) Stats {
 
 		ext := filepath.Ext(name)
 		if ext == "" {
-			ext = "(sem ext)"
+			ext = "(no ext)"
 		}
 
 		// Detectar se é texto

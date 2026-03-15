@@ -78,8 +78,8 @@ func TestScan_GroupsByExtension(t *testing.T) {
 	}
 
 	// sem ext: Makefile(1)
-	if stats.ByExt["(sem ext)"] != 1 {
-		t.Errorf("esperado (sem ext)=1, obtido %d", stats.ByExt["(sem ext)"])
+	if stats.ByExt["(no ext)"] != 1 {
+		t.Errorf("esperado (sem ext)=1, obtido %d", stats.ByExt["(no ext)"])
 	}
 }
 

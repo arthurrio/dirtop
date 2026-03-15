@@ -1,4 +1,4 @@
-module monitor-cli
+module github.com/arthurrio/dirtop
 
 go 1.26.1
 
