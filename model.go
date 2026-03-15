@@ -34,9 +34,9 @@ type metricDef struct {
 
 // chartMetrics lista as métricas disponíveis para o gráfico (single-metric).
 var chartMetrics = [3]metricDef{
-	{"linhas", ColorPurple},
-	{"arquivos", ColorBlue},
-	{"pastas", ColorGreen},
+	{"lines", ColorPurple},
+	{"files", ColorBlue},
+	{"dirs", ColorGreen},
 }
 
 // Model é o estado da aplicação bubbletea.
@@ -49,7 +49,7 @@ type Model struct {
 	chartMode   ChartMode
 	intervals   []time.Duration
 	intervalIdx int
-	metricIdx   int // índice em chartMetrics; ignorado no modo multi
+	metricIdx   int // index in chartMetrics; ignored in multi mode
 }
 
 // interval retorna o intervalo de atualização atual, com fallback seguro.
@@ -149,18 +149,18 @@ func (m Model) View() string {
 	if m.width < 40 || m.height < 10 {
 		return lipgloss.Place(m.width, m.height,
 			lipgloss.Center, lipgloss.Center,
-			StyleGray.Render("Terminal muito pequeno"),
+			StyleGray.Render("Terminal too small"),
 		)
 	}
 
 	var sb strings.Builder
 
 	// --- Linha de status ---
-	indicator := StyleGray.Render(fmt.Sprintf("↺ %s", formatInterval(m.interval())))
+	indicator := StyleGray.Render(fmt.Sprintf("↺ %s [i]", formatInterval(m.interval())))
 	if m.current.Scanning {
-		indicator = StyleOrange.Render("↺ scanning…")
+		indicator = StyleOrange.Render("↺ scanning...")
 	}
-	statusLine := fmt.Sprintf(" ▶ monitor-cli  [%s]  %s",
+	statusLine := fmt.Sprintf(" ▶ dirtop  [%s]  %s",
 		StyleGray.Render(m.cwd),
 		indicator,
 	)
@@ -173,15 +173,15 @@ func (m Model) View() string {
 	if m.chartMode == ChartMultiLine {
 		active = -1 // nenhuma destacada individualmente no modo multi
 	}
-	labelFiles := StyleGray.Render("arquivos")
-	labelDirs := StyleGray.Render("│  pastas")
-	labelLines := StyleGray.Render("│  linhas")
+	labelFiles := StyleGray.Render("files")
+	labelDirs := StyleGray.Render("│  dirs")
+	labelLines := StyleGray.Render("│  lines")
 	if active == 1 {
-		labelFiles = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorBlue)).Bold(true).Render("arquivos")
+		labelFiles = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorBlue)).Bold(true).Render("files")
 	} else if active == 2 {
-		labelDirs = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorGreen)).Bold(true).Render("│  pastas")
+		labelDirs = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorGreen)).Bold(true).Render("│  dirs")
 	} else if active == 0 {
-		labelLines = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPurple)).Bold(true).Render("│  linhas")
+		labelLines = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPurple)).Bold(true).Render("│  lines")
 	}
 	metricsLine := fmt.Sprintf("  %s  %s    %s  %s    %s  %s",
 		labelFiles,
@@ -201,9 +201,9 @@ func (m Model) View() string {
 	// --- Histórico / Gráfico ---
 	metricHint := fmt.Sprintf("  [m: %s]", chartMetrics[m.metricIdx].name)
 	if m.chartMode == ChartMultiLine {
-		metricHint = "" // modo multi mostra as três, hint não se aplica
+		metricHint = "" // multi mode shows all three, hint does not apply
 	}
-	histLabel := fmt.Sprintf(" HISTÓRICO  [c: %s]%s", m.chartMode.Name(), metricHint)
+	histLabel := fmt.Sprintf(" HISTORY  [c: %s]%s", m.chartMode.Name(), metricHint)
 	sb.WriteString(StyleGray.Render(histLabel))
 	sb.WriteString("\n")
 
@@ -252,7 +252,7 @@ func (m Model) View() string {
 	sb.WriteString("\n")
 
 	// --- Extensões ---
-	sb.WriteString(StyleGray.Render(" EXTENSÕES"))
+	sb.WriteString(StyleGray.Render(" EXTENSIONS"))
 	sb.WriteString("\n")
 	sb.WriteString(renderExtensions(m.current.ByExt, m.width))
 
@@ -275,7 +275,7 @@ func renderExtensions(byExt map[string]int, width int) string {
 	var noExt *extEntry
 
 	for k, v := range byExt {
-		if k == "(sem ext)" {
+		if k == "(no ext)" {
 			e := extEntry{k, v}
 			noExt = &e
 			continue

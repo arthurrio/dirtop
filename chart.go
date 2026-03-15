@@ -143,7 +143,7 @@ func Render(values []int, width, height int) string {
 // renderXAxis retorna a linha do eixo X com "t=0s" à esquerda e "agora" à direita.
 func renderXAxis(width int) string {
 	left := "t=0s"
-	right := "agora"
+	right := "now"
 	sepLen := width - len(left) - len(right)
 	if sepLen < 0 {
 		sepLen = 0
@@ -187,17 +187,17 @@ func maxInt(vals []int) int {
 type ChartMode int
 
 const (
-	ChartBraille   ChartMode = iota // área preenchida (padrão)
+	ChartHorizBar  ChartMode = iota // histograma horizontal de blocos (padrão)
+	ChartBraille                    // área preenchida
 	ChartSparkline                  // apenas a linha, sem preenchimento
 	ChartMultiLine                  // três métricas sobrepostas
 	ChartDelta                      // variação (Δ) em relação ao ponto anterior
-	ChartHorizBar                   // histograma horizontal de blocos
 	chartModeCount
 )
 
 // Name retorna o nome legível do modo de gráfico.
 func (m ChartMode) Name() string {
-	names := [...]string{"área", "linha", "multi", "delta", "barras"}
+	names := [...]string{"bars", "area", "line", "multi", "delta"}
 	if int(m) < len(names) {
 		return names[m]
 	}
@@ -382,9 +382,9 @@ func RenderMultiLine(files, dirs, lines []int, width, height int) string {
 	}
 	sb.WriteString("\n")
 	// Legenda substitui o eixo X
-	legendL := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPurple)).Render("─ linhas")
-	legendF := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorBlue)).Render("─ arquivos")
-	legendD := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorGreen)).Render("─ pastas")
+	legendL := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPurple)).Render("─ lines")
+	legendF := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorBlue)).Render("─ files")
+	legendD := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorGreen)).Render("─ dirs")
 	sb.WriteString(fmt.Sprintf(" %s   %s   %s", legendL, legendF, legendD))
 	return sb.String()
 }
@@ -520,7 +520,7 @@ func RenderDelta(values []int, width, height int) string {
 // formatAgo formata uma duração de offset como "-5s", "-2m", "-1h".
 func formatAgo(d time.Duration) string {
 	if d <= 0 {
-		return "agora"
+		return "now"
 	}
 	s := int(d.Seconds())
 	if s < 60 {
@@ -557,8 +557,8 @@ func RenderHorizBar(values []int, width, height int, interval time.Duration) str
 	// Calcular labelWidth dinamicamente pelo pior caso visível
 	maxOffset := time.Duration(n-1) * interval
 	labelWidth := len(formatAgo(maxOffset))
-	if labelWidth < len("agora") {
-		labelWidth = len("agora")
+	if labelWidth < len("now") {
+		labelWidth = len("now")
 	}
 
 	const valueWidth = 10 // número formatado alinhado à direita
