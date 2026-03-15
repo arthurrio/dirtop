@@ -156,7 +156,7 @@ func (m Model) View() string {
 	var sb strings.Builder
 
 	// --- Linha de status ---
-	indicator := StyleGray.Render(fmt.Sprintf("↺ %s", formatInterval(m.interval())))
+	indicator := StyleGray.Render(fmt.Sprintf("↺ %s [i]", formatInterval(m.interval())))
 	if m.current.Scanning {
 		indicator = StyleOrange.Render("↺ scanning...")
 	}
@@ -203,7 +203,7 @@ func (m Model) View() string {
 	if m.chartMode == ChartMultiLine {
 		metricHint = "" // multi mode shows all three, hint does not apply
 	}
-	histLabel := fmt.Sprintf(" HISTORY  [c: %s]%s  [i: %s]", m.chartMode.Name(), metricHint, formatInterval(m.interval()))
+	histLabel := fmt.Sprintf(" HISTORY  [c: %s]%s", m.chartMode.Name(), metricHint)
 	sb.WriteString(StyleGray.Render(histLabel))
 	sb.WriteString("\n")
 
