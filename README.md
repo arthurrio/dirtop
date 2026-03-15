@@ -28,6 +28,13 @@ t=0s─────────────────────────�
 
 ## Installation
 
+### Homebrew (macOS & Linux)
+
+```bash
+brew tap arthurrio/dirtop
+brew install dirtop
+```
+
 ### One-line install (Linux & macOS)
 
 ```bash
@@ -49,6 +56,33 @@ git clone https://github.com/arthurrio/dirtop.git
 cd dirtop
 go build -o dirtop .
 sudo mv dirtop /usr/local/bin/
+```
+
+## Uninstall
+
+### Homebrew
+
+```bash
+brew uninstall dirtop
+brew untap arthurrio/dirtop
+```
+
+### Go install
+
+```bash
+rm $(which dirtop)
+```
+
+Or, if installed to the default Go bin directory:
+
+```bash
+rm ~/go/bin/dirtop
+```
+
+### Manual / install.sh
+
+```bash
+sudo rm /usr/local/bin/dirtop
 ```
 
 ## Usage
