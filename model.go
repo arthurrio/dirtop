@@ -180,15 +180,16 @@ func renderExtensions(byExt map[string]int, width int) string {
 		entries = append(entries, *noExt)
 	}
 
-	colWidth := (width - 1) / 2
+	leftColWidth := (width - 1) / 2
+	rightColWidth := width - 1 - leftColWidth
 	const countWidth = 8
 
 	var sb strings.Builder
 	for i := 0; i < len(entries); i += 2 {
-		left := formatExtEntry(entries[i], colWidth, countWidth)
+		left := formatExtEntry(entries[i], leftColWidth, countWidth)
 		right := ""
 		if i+1 < len(entries) {
-			right = formatExtEntry(entries[i+1], colWidth, countWidth)
+			right = formatExtEntry(entries[i+1], rightColWidth, countWidth)
 		}
 		sb.WriteString(" ")
 		sb.WriteString(left)
