@@ -104,9 +104,10 @@ func isTextFile(path string) bool {
 	defer f.Close()
 
 	buf := make([]byte, 512)
-	n, err := f.Read(buf)
-	if err != nil && n == 0 {
-		return false
+	n, _ := f.Read(buf)
+	if n == 0 {
+		// Empty file — treat as text (0 lines)
+		return true
 	}
 
 	for _, b := range buf[:n] {
