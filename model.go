@@ -17,13 +17,72 @@ type tickMsg time.Time
 
 const historyMaxLen = 3600
 
+// DefaultIntervals é a lista padrão de intervalos de atualização.
+var DefaultIntervals = []time.Duration{
+	1 * time.Second,
+	5 * time.Second,
+	10 * time.Second,
+	30 * time.Second,
+	60 * time.Second,
+}
+
+// metricDef descreve uma métrica exibível no gráfico.
+type metricDef struct {
+	name  string
+	color string
+}
+
+// chartMetrics lista as métricas disponíveis para o gráfico (single-metric).
+var chartMetrics = [3]metricDef{
+	{"linhas", ColorPurple},
+	{"arquivos", ColorBlue},
+	{"pastas", ColorGreen},
+}
+
 // Model é o estado da aplicação bubbletea.
 type Model struct {
-	history []Stats
-	current Stats
-	cwd     string
-	width   int
-	height  int
+	history     []Stats
+	current     Stats
+	cwd         string
+	width       int
+	height      int
+	chartMode   ChartMode
+	intervals   []time.Duration
+	intervalIdx int
+	metricIdx   int // índice em chartMetrics; ignorado no modo multi
+}
+
+// interval retorna o intervalo de atualização atual, com fallback seguro.
+func (m Model) interval() time.Duration {
+	if len(m.intervals) == 0 {
+		return time.Second
+	}
+	return m.intervals[m.intervalIdx]
+}
+
+// metricValues extrai do histórico os valores da métrica atualmente selecionada.
+func (m Model) metricValues() []int {
+	vals := make([]int, len(m.history))
+	for i, s := range m.history {
+		switch m.metricIdx {
+		case 1:
+			vals[i] = s.Files
+		case 2:
+			vals[i] = s.Dirs
+		default:
+			vals[i] = s.Lines
+		}
+	}
+	return vals
+}
+
+// formatInterval formata uma duração como "1s", "30s", "1m", "5m".
+func formatInterval(d time.Duration) string {
+	s := int(d.Seconds())
+	if s < 60 {
+		return fmt.Sprintf("%ds", s)
+	}
+	return fmt.Sprintf("%dm", s/60)
 }
 
 // Init dispara a primeira varredura imediatamente, sem esperar 1 segundo.
@@ -38,9 +97,9 @@ func scanCmd(path string) tea.Cmd {
 	}
 }
 
-// tickCmd agenda um tick após 1 segundo.
-func tickCmd() tea.Cmd {
-	return tea.Tick(1*time.Second, func(t time.Time) tea.Msg {
+// tickCmd agenda um tick após a duração especificada.
+func tickCmd(d time.Duration) tea.Cmd {
+	return tea.Tick(d, func(t time.Time) tea.Msg {
 		return tickMsg(t)
 	})
 }
@@ -58,7 +117,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.history = append(m.history, stats)
 		m.current = stats
-		return m, tickCmd()
+		return m, tickCmd(m.interval())
 
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -66,8 +125,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
-		if msg.String() == "q" || msg.String() == "ctrl+c" {
+		switch msg.String() {
+		case "q", "ctrl+c":
 			return m, tea.Quit
+		case "c":
+			m.chartMode = (m.chartMode + 1) % chartModeCount
+		case "i":
+			if len(m.intervals) > 0 {
+				m.intervalIdx = (m.intervalIdx + 1) % len(m.intervals)
+			}
+		case "m":
+			if m.chartMode != ChartMultiLine {
+				m.metricIdx = (m.metricIdx + 1) % len(chartMetrics)
+			}
 		}
 	}
 
@@ -86,7 +156,7 @@ func (m Model) View() string {
 	var sb strings.Builder
 
 	// --- Linha de status ---
-	indicator := StyleGray.Render("↺ 1s")
+	indicator := StyleGray.Render(fmt.Sprintf("↺ %s", formatInterval(m.interval())))
 	if m.current.Scanning {
 		indicator = StyleOrange.Render("↺ scanning…")
 	}
@@ -98,12 +168,27 @@ func (m Model) View() string {
 	sb.WriteString("\n")
 
 	// --- Métricas inline ---
+	// A métrica ativa no gráfico (single-metric) é destacada com sua própria cor no label.
+	active := m.metricIdx
+	if m.chartMode == ChartMultiLine {
+		active = -1 // nenhuma destacada individualmente no modo multi
+	}
+	labelFiles := StyleGray.Render("arquivos")
+	labelDirs := StyleGray.Render("│  pastas")
+	labelLines := StyleGray.Render("│  linhas")
+	if active == 1 {
+		labelFiles = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorBlue)).Bold(true).Render("arquivos")
+	} else if active == 2 {
+		labelDirs = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorGreen)).Bold(true).Render("│  pastas")
+	} else if active == 0 {
+		labelLines = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPurple)).Bold(true).Render("│  linhas")
+	}
 	metricsLine := fmt.Sprintf("  %s  %s    %s  %s    %s  %s",
-		StyleGray.Render("arquivos"),
+		labelFiles,
 		StyleBlue.Render(formatNumber(m.current.Files)),
-		StyleGray.Render("│  pastas"),
+		labelDirs,
 		StyleGreen.Render(formatNumber(m.current.Dirs)),
-		StyleGray.Render("│  linhas"),
+		labelLines,
 		StylePurple.Render(formatNumber(m.current.Lines)),
 	)
 	sb.WriteString(metricsLine)
@@ -114,7 +199,12 @@ func (m Model) View() string {
 	sb.WriteString("\n")
 
 	// --- Histórico / Gráfico ---
-	sb.WriteString(StyleGray.Render(" HISTÓRICO"))
+	metricHint := fmt.Sprintf("  [m: %s]", chartMetrics[m.metricIdx].name)
+	if m.chartMode == ChartMultiLine {
+		metricHint = "" // modo multi mostra as três, hint não se aplica
+	}
+	histLabel := fmt.Sprintf(" HISTÓRICO  [c: %s]%s", m.chartMode.Name(), metricHint)
+	sb.WriteString(StyleGray.Render(histLabel))
 	sb.WriteString("\n")
 
 	// Calcular linhas de extensões (limitado ao espaço disponível)
@@ -131,11 +221,30 @@ func (m Model) View() string {
 		chartHeight = 5
 	}
 
-	values := make([]int, len(m.history))
-	for i, s := range m.history {
-		values[i] = s.Lines
+	metricVals := m.metricValues()
+
+	var chartStr string
+	switch m.chartMode {
+	case ChartSparkline:
+		chartStr = RenderSparkline(metricVals, m.width, chartHeight)
+	case ChartMultiLine:
+		filesVals := make([]int, len(m.history))
+		dirsVals := make([]int, len(m.history))
+		linesVals := make([]int, len(m.history))
+		for i, s := range m.history {
+			filesVals[i] = s.Files
+			dirsVals[i] = s.Dirs
+			linesVals[i] = s.Lines
+		}
+		chartStr = RenderMultiLine(filesVals, dirsVals, linesVals, m.width, chartHeight)
+	case ChartDelta:
+		chartStr = RenderDelta(metricVals, m.width, chartHeight)
+	case ChartHorizBar:
+		chartStr = RenderHorizBar(metricVals, m.width, chartHeight, m.interval())
+	default:
+		chartStr = Render(metricVals, m.width, chartHeight)
 	}
-	sb.WriteString(Render(values, m.width, chartHeight))
+	sb.WriteString(chartStr)
 	sb.WriteString("\n")
 
 	// --- Separador ---

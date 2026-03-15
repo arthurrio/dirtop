@@ -4,6 +4,7 @@ package main
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -178,4 +179,423 @@ func maxInt(vals []int) int {
 		}
 	}
 	return m
+}
+
+// ─── Modos de gráfico ────────────────────────────────────────────────────────
+
+// ChartMode define o tipo de visualização do histórico.
+type ChartMode int
+
+const (
+	ChartBraille   ChartMode = iota // área preenchida (padrão)
+	ChartSparkline                  // apenas a linha, sem preenchimento
+	ChartMultiLine                  // três métricas sobrepostas
+	ChartDelta                      // variação (Δ) em relação ao ponto anterior
+	ChartHorizBar                   // histograma horizontal de blocos
+	chartModeCount
+)
+
+// Name retorna o nome legível do modo de gráfico.
+func (m ChartMode) Name() string {
+	names := [...]string{"área", "linha", "multi", "delta", "barras"}
+	if int(m) < len(names) {
+		return names[m]
+	}
+	return "?"
+}
+
+// ─── Sparkline ───────────────────────────────────────────────────────────────
+
+// RenderSparkline renderiza apenas a linha do gráfico, sem preenchimento.
+func RenderSparkline(values []int, width, height int) string {
+	if height < 2 {
+		height = 2
+	}
+	chartRows := height - 1
+	maxVal := maxInt(values)
+	if maxVal == 0 {
+		return blankBlock(width, height)
+	}
+	maxValues := width * 2
+	if len(values) > maxValues {
+		values = values[len(values)-maxValues:]
+	}
+	totalDots := chartRows * 4
+	normalized := make([]int, len(values))
+	for i, v := range values {
+		n := v * totalDots / maxVal
+		if n == 0 && v > 0 {
+			n = 1
+		}
+		normalized[i] = n
+	}
+	cols := (len(normalized) + 1) / 2
+	if cols > width {
+		cols = width
+	}
+	grid := make([][]uint8, chartRows)
+	for i := range grid {
+		grid[i] = make([]uint8, cols)
+	}
+
+	// Acende apenas o ponto mais alto de cada sub-coluna (sem preenchimento)
+	setTopBit := func(colIdx, val int, bits [4]uint8) {
+		if val <= 0 {
+			return
+		}
+		dotRow := val - 1
+		row := chartRows - 1 - dotRow/4
+		bit := 3 - (dotRow % 4)
+		if row >= 0 && row < chartRows {
+			grid[row][colIdx] |= 1 << bits[bit]
+		}
+	}
+	for colIdx := 0; colIdx < cols; colIdx++ {
+		leftVal, rightVal := 0, 0
+		if colIdx*2 < len(normalized) {
+			leftVal = normalized[colIdx*2]
+		}
+		if colIdx*2+1 < len(normalized) {
+			rightVal = normalized[colIdx*2+1]
+		}
+		setTopBit(colIdx, leftVal, brailleLeft)
+		setTopBit(colIdx, rightVal, brailleRight)
+	}
+
+	styleLine := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPurple))
+	var sb strings.Builder
+	for row := 0; row < chartRows; row++ {
+		if row > 0 {
+			sb.WriteString("\n")
+		}
+		line := make([]string, width)
+		for i := range line {
+			line[i] = " "
+		}
+		for colIdx := 0; colIdx < cols; colIdx++ {
+			if mask := grid[row][colIdx]; mask != 0 {
+				line[colIdx] = styleLine.Render(string(rune(0x2800 + int(mask))))
+			}
+		}
+		sb.WriteString(strings.Join(line, ""))
+	}
+	sb.WriteString("\n")
+	sb.WriteString(renderXAxis(width))
+	return sb.String()
+}
+
+// ─── Multi-linha ─────────────────────────────────────────────────────────────
+
+// RenderMultiLine renderiza três métricas sobrepostas no mesmo gráfico braille.
+// Cada série é normalizada de forma independente para melhor visibilidade.
+// Prioridade de cor em conflito de célula: linhas > arquivos > pastas.
+func RenderMultiLine(files, dirs, lines []int, width, height int) string {
+	if height < 2 {
+		height = 2
+	}
+	chartRows := height - 1
+	maxValues := width * 2
+
+	// Ordem de desenho: dirs (menor prioridade) → files → lines (maior prioridade)
+	type series struct {
+		vals  []int
+		color string
+	}
+	allSeries := []series{
+		{dirs, ColorGreen},
+		{files, ColorBlue},
+		{lines, ColorPurple},
+	}
+
+	maskGrid := make([][]uint8, chartRows)
+	colorGrid := make([][]string, chartRows)
+	for i := range maskGrid {
+		maskGrid[i] = make([]uint8, width)
+		colorGrid[i] = make([]string, width)
+	}
+
+	for _, s := range allSeries {
+		vals := s.vals
+		maxVal := maxInt(vals)
+		if maxVal == 0 {
+			continue
+		}
+		if len(vals) > maxValues {
+			vals = vals[len(vals)-maxValues:]
+		}
+		totalDots := chartRows * 4
+		normalized := make([]int, len(vals))
+		for i, v := range vals {
+			n := v * totalDots / maxVal
+			if n == 0 && v > 0 {
+				n = 1
+			}
+			normalized[i] = n
+		}
+		cols := (len(normalized) + 1) / 2
+		if cols > width {
+			cols = width
+		}
+		setTopBit := func(colIdx, val int, bits [4]uint8) {
+			if val <= 0 || colIdx >= width {
+				return
+			}
+			dotRow := val - 1
+			row := chartRows - 1 - dotRow/4
+			bit := 3 - (dotRow % 4)
+			if row >= 0 && row < chartRows {
+				maskGrid[row][colIdx] |= 1 << bits[bit]
+				colorGrid[row][colIdx] = s.color
+			}
+		}
+		for colIdx := 0; colIdx < cols; colIdx++ {
+			leftVal, rightVal := 0, 0
+			if colIdx*2 < len(normalized) {
+				leftVal = normalized[colIdx*2]
+			}
+			if colIdx*2+1 < len(normalized) {
+				rightVal = normalized[colIdx*2+1]
+			}
+			setTopBit(colIdx, leftVal, brailleLeft)
+			setTopBit(colIdx, rightVal, brailleRight)
+		}
+	}
+
+	var sb strings.Builder
+	for row := 0; row < chartRows; row++ {
+		if row > 0 {
+			sb.WriteString("\n")
+		}
+		line := make([]string, width)
+		for i := range line {
+			line[i] = " "
+		}
+		for colIdx := 0; colIdx < width; colIdx++ {
+			mask := maskGrid[row][colIdx]
+			if mask == 0 {
+				continue
+			}
+			ch := string(rune(0x2800 + int(mask)))
+			line[colIdx] = lipgloss.NewStyle().Foreground(lipgloss.Color(colorGrid[row][colIdx])).Render(ch)
+		}
+		sb.WriteString(strings.Join(line, ""))
+	}
+	sb.WriteString("\n")
+	// Legenda substitui o eixo X
+	legendL := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPurple)).Render("─ linhas")
+	legendF := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorBlue)).Render("─ arquivos")
+	legendD := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorGreen)).Render("─ pastas")
+	sb.WriteString(fmt.Sprintf(" %s   %s   %s", legendL, legendF, legendD))
+	return sb.String()
+}
+
+// ─── Delta ───────────────────────────────────────────────────────────────────
+
+// RenderDelta renderiza a variação (Δ) entre amostras consecutivas.
+// Crescimento aparece acima da linha central (verde), queda abaixo (laranja).
+func RenderDelta(values []int, width, height int) string {
+	if height < 2 {
+		height = 2
+	}
+	if len(values) < 2 {
+		return blankBlock(width, height)
+	}
+	chartRows := height - 1
+
+	deltas := make([]int, len(values)-1)
+	for i := 1; i < len(values); i++ {
+		deltas[i-1] = values[i] - values[i-1]
+	}
+	maxAbs := 0
+	for _, d := range deltas {
+		if d < 0 {
+			d = -d
+		}
+		if d > maxAbs {
+			maxAbs = d
+		}
+	}
+	if maxAbs == 0 {
+		return blankBlock(width, height)
+	}
+	maxValues := width * 2
+	if len(deltas) > maxValues {
+		deltas = deltas[len(deltas)-maxValues:]
+	}
+
+	halfDots := (chartRows * 4) / 2
+	normalized := make([]int, len(deltas))
+	for i, d := range deltas {
+		normalized[i] = d * halfDots / maxAbs
+	}
+	cols := (len(normalized) + 1) / 2
+	if cols > width {
+		cols = width
+	}
+
+	grid := make([][]uint8, chartRows)
+	signGrid := make([][]int, chartRows) // 1 = positivo, -1 = negativo
+	for i := range grid {
+		grid[i] = make([]uint8, cols)
+		signGrid[i] = make([]int, cols)
+	}
+
+	center := halfDots
+	fillDots := func(colIdx, val int, bits [4]uint8, sign int) {
+		var start, end int
+		if val >= 0 {
+			start = center
+			end = center + val
+		} else {
+			start = center + val
+			end = center
+		}
+		for dotRow := start; dotRow < end; dotRow++ {
+			row := chartRows - 1 - dotRow/4
+			bit := 3 - (dotRow % 4)
+			if row >= 0 && row < chartRows {
+				grid[row][colIdx] |= 1 << bits[bit]
+				signGrid[row][colIdx] = sign
+			}
+		}
+	}
+	for colIdx := 0; colIdx < cols; colIdx++ {
+		leftVal, rightVal := 0, 0
+		if colIdx*2 < len(normalized) {
+			leftVal = normalized[colIdx*2]
+		}
+		if colIdx*2+1 < len(normalized) {
+			rightVal = normalized[colIdx*2+1]
+		}
+		leftSign, rightSign := 1, 1
+		if leftVal < 0 {
+			leftSign = -1
+		}
+		if rightVal < 0 {
+			rightSign = -1
+		}
+		fillDots(colIdx, leftVal, brailleLeft, leftSign)
+		fillDots(colIdx, rightVal, brailleRight, rightSign)
+	}
+
+	centerGridRow := chartRows - 1 - center/4
+	stylePos := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorGreen))
+	styleNeg := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorOrange))
+	styleCenter := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorGray))
+
+	var sb strings.Builder
+	for row := 0; row < chartRows; row++ {
+		if row > 0 {
+			sb.WriteString("\n")
+		}
+		line := make([]string, width)
+		for i := range line {
+			if row == centerGridRow {
+				line[i] = styleCenter.Render("·")
+			} else {
+				line[i] = " "
+			}
+		}
+		for colIdx := 0; colIdx < cols; colIdx++ {
+			mask := grid[row][colIdx]
+			if mask == 0 {
+				continue
+			}
+			ch := string(rune(0x2800 + int(mask)))
+			if signGrid[row][colIdx] >= 0 {
+				line[colIdx] = stylePos.Render(ch)
+			} else {
+				line[colIdx] = styleNeg.Render(ch)
+			}
+		}
+		sb.WriteString(strings.Join(line, ""))
+	}
+	sb.WriteString("\n")
+	sb.WriteString(renderXAxis(width))
+	return sb.String()
+}
+
+// ─── Histograma horizontal ───────────────────────────────────────────────────
+
+// formatAgo formata uma duração de offset como "-5s", "-2m", "-1h".
+func formatAgo(d time.Duration) string {
+	if d <= 0 {
+		return "agora"
+	}
+	s := int(d.Seconds())
+	if s < 60 {
+		return fmt.Sprintf("-%ds", s)
+	}
+	if s < 3600 {
+		return fmt.Sprintf("-%dm", s/60)
+	}
+	return fmt.Sprintf("-%dh", s/3600)
+}
+
+// RenderHorizBar renderiza um histograma horizontal com barras de blocos.
+// Cada linha representa uma amostra; a mais recente fica no topo.
+// interval é o tempo real entre cada amostra, usado para calcular os labels de tempo.
+func RenderHorizBar(values []int, width, height int, interval time.Duration) string {
+	if interval <= 0 {
+		interval = time.Second
+	}
+	if height < 1 {
+		height = 1
+	}
+	maxVal := maxInt(values)
+	if maxVal == 0 {
+		return blankBlock(width, height)
+	}
+
+	// Mostrar os últimos `height` samples (mais recente no topo)
+	samples := values
+	if len(samples) > height {
+		samples = samples[len(samples)-height:]
+	}
+	n := len(samples)
+
+	// Calcular labelWidth dinamicamente pelo pior caso visível
+	maxOffset := time.Duration(n-1) * interval
+	labelWidth := len(formatAgo(maxOffset))
+	if labelWidth < len("agora") {
+		labelWidth = len("agora")
+	}
+
+	const valueWidth = 10 // número formatado alinhado à direita
+	// layout por linha: label + " " + bar + " " + value
+	barArea := width - labelWidth - 2 - valueWidth
+	if barArea < 1 {
+		barArea = 1
+	}
+
+	styleLabel := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorGray))
+	styleBar := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPurple))
+	styleValue := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPurple))
+
+	var sb strings.Builder
+	for i := 0; i < height; i++ {
+		if i > 0 {
+			sb.WriteString("\n")
+		}
+		sampleIdx := n - 1 - i // índice 0 = mais recente no topo
+		if sampleIdx < 0 {
+			sb.WriteString(strings.Repeat(" ", width))
+			continue
+		}
+
+		val := samples[sampleIdx]
+		offset := time.Duration(n-1-sampleIdx) * interval
+		label := fmt.Sprintf("%*s", labelWidth, formatAgo(offset))
+
+		barLen := val * barArea / maxVal
+		bar := strings.Repeat("█", barLen) + strings.Repeat(" ", barArea-barLen)
+		valueStr := fmt.Sprintf("%*s", valueWidth, formatNumber(val))
+
+		sb.WriteString(styleLabel.Render(label))
+		sb.WriteString(" ")
+		sb.WriteString(styleBar.Render(bar))
+		sb.WriteString(" ")
+		sb.WriteString(styleValue.Render(valueStr))
+	}
+	return sb.String()
 }
