@@ -9,58 +9,58 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// Mapeamento dos pontos braille para bits no bloco U+2800.
-// Coluna esquerda: pontos 1,2,3,7 → bits 0,1,2,6
-// Coluna direita:  pontos 4,5,6,8 → bits 3,4,5,7
-// Cada célula cobre 2 colunas × 4 linhas.
-var brailleLeft = [4]uint8{0, 1, 2, 6}  // bits para linhas 0-3 da coluna esquerda
-var brailleRight = [4]uint8{3, 4, 5, 7} // bits para linhas 0-3 da coluna direita
+// Mapping of braille dots to bits in the U+2800 block.
+// Left column: dots 1,2,3,7 -> bits 0,1,2,6
+// Right column: dots 4,5,6,8 -> bits 3,4,5,7
+// Each cell covers 2 columns x 4 rows.
+var brailleLeft = [4]uint8{0, 1, 2, 6}  // Bits for rows 0-3 in the left column.
+var brailleRight = [4]uint8{3, 4, 5, 7} // Bits for rows 0-3 in the right column.
 
-// Render renderiza um gráfico de linha com área preenchida usando caracteres braille.
+// Render draws a line chart with a filled area using braille characters.
 //
-// O parâmetro height inclui a linha do eixo X.
-// A área de desenho usa height-1 linhas; a última linha é sempre o eixo X.
+// The height parameter includes the X-axis row.
+// The drawing area uses height-1 rows; the last row is always the X-axis.
 //
-// Se values for vazio ou todos zeros, retorna um bloco de espaços width×height.
+// If values is empty or all zeros, it returns a width x height block of spaces.
 func Render(values []int, width, height int) string {
 	if height < 2 {
 		height = 2
 	}
 
-	chartRows := height - 1 // linhas disponíveis para o gráfico braille
+	chartRows := height - 1 // Available rows for the braille chart.
 
-	// Caso vazio ou todos zeros
+	// Empty or all-zero input.
 	maxVal := maxInt(values)
 	if maxVal == 0 {
 		return blankBlock(width, height)
 	}
 
-	// Truncar se necessário: cada célula braille usa 2 valores
+	// Truncate if needed: each braille cell uses 2 values.
 	maxValues := width * 2
 	if len(values) > maxValues {
 		values = values[len(values)-maxValues:]
 	}
-	totalDots := chartRows * 4 // pontos verticais disponíveis
+	totalDots := chartRows * 4 // Available vertical dots.
 
-	// Normalizar valores para [0, totalDots]
+	// Normalize values into [0, totalDots].
 	normalized := make([]int, len(values))
 	for i, v := range values {
 		normalized[i] = v * totalDots / maxVal
 	}
 
-	// Construir grade de células braille: [linha][coluna]
+	// Build the braille cell grid: [row][column].
 	cols := (len(normalized) + 1) / 2
 	if cols > width {
 		cols = width
 	}
 
-	// grid[row][col] = bitmask do caractere braille
+	// grid[row][col] = bitmask for the braille character.
 	grid := make([][]uint8, chartRows)
 	for i := range grid {
 		grid[i] = make([]uint8, cols)
 	}
 
-	// Preencher o grid
+	// Fill the grid.
 	for colIdx := 0; colIdx < cols; colIdx++ {
 		leftIdx := colIdx * 2
 		rightIdx := leftIdx + 1
@@ -74,7 +74,7 @@ func Render(values []int, width, height int) string {
 			rightVal = normalized[rightIdx]
 		}
 
-		// Acender pontos da base até o valor
+		// Light dots from the baseline up to the value.
 		for dotRow := 0; dotRow < leftVal; dotRow++ {
 			row := chartRows - 1 - dotRow/4
 			bit := 3 - (dotRow % 4)
@@ -91,10 +91,10 @@ func Render(values []int, width, height int) string {
 		}
 	}
 
-	// Determinar a linha "topo" de cada coluna (linha vs área)
+	// Determine the top row of each column for the line overlay.
 	topRow := make([]int, cols)
 	for colIdx := 0; colIdx < cols; colIdx++ {
-		topRow[colIdx] = chartRows // default: sem valor
+		topRow[colIdx] = chartRows // Default: no value.
 		for row := 0; row < chartRows; row++ {
 			if grid[row][colIdx] != 0 {
 				topRow[colIdx] = row
@@ -133,14 +133,14 @@ func Render(values []int, width, height int) string {
 		sb.WriteString(strings.Join(line, ""))
 	}
 
-	// Eixo X
+	// X-axis.
 	sb.WriteString("\n")
 	sb.WriteString(renderXAxis(width))
 
 	return sb.String()
 }
 
-// renderXAxis retorna a linha do eixo X com "t=0s" à esquerda e "agora" à direita.
+// renderXAxis returns the X-axis row with "t=0s" on the left and "now" on the right.
 func renderXAxis(width int) string {
 	left := "t=0s"
 	right := "now"
@@ -157,7 +157,7 @@ func renderXAxis(width int) string {
 	)
 }
 
-// blankBlock retorna um bloco de espaços com exatamente width×height caracteres.
+// blankBlock returns a block of spaces with exactly width x height characters.
 func blankBlock(width, height int) string {
 	row := strings.Repeat(" ", width)
 	rows := make([]string, height)
@@ -167,7 +167,7 @@ func blankBlock(width, height int) string {
 	return strings.Join(rows, "\n")
 }
 
-// maxInt retorna o maior valor de um slice de inteiros.
+// maxInt returns the largest value in an integer slice.
 func maxInt(vals []int) int {
 	if len(vals) == 0 {
 		return 0
@@ -181,21 +181,21 @@ func maxInt(vals []int) int {
 	return m
 }
 
-// ─── Modos de gráfico ────────────────────────────────────────────────────────
+// ─── Chart Modes ─────────────────────────────────────────────────────────────
 
-// ChartMode define o tipo de visualização do histórico.
+// ChartMode defines the history visualization type.
 type ChartMode int
 
 const (
-	ChartHorizBar  ChartMode = iota // histograma horizontal de blocos (padrão)
-	ChartBraille                    // área preenchida
-	ChartSparkline                  // apenas a linha, sem preenchimento
-	ChartMultiLine                  // três métricas sobrepostas
-	ChartDelta                      // variação (Δ) em relação ao ponto anterior
+	ChartHorizBar  ChartMode = iota // Horizontal block histogram (default).
+	ChartBraille                    // Filled area.
+	ChartSparkline                  // Line only, no fill.
+	ChartMultiLine                  // Three overlaid metrics.
+	ChartDelta                      // Delta versus the previous point.
 	chartModeCount
 )
 
-// Name retorna o nome legível do modo de gráfico.
+// Name returns the user-facing chart mode name.
 func (m ChartMode) Name() string {
 	names := [...]string{"bars", "area", "line", "multi", "delta"}
 	if int(m) < len(names) {
@@ -206,7 +206,7 @@ func (m ChartMode) Name() string {
 
 // ─── Sparkline ───────────────────────────────────────────────────────────────
 
-// RenderSparkline renderiza apenas a linha do gráfico, sem preenchimento.
+// RenderSparkline renders only the chart line, without fill.
 func RenderSparkline(values []int, width, height int) string {
 	if height < 2 {
 		height = 2
@@ -238,7 +238,7 @@ func RenderSparkline(values []int, width, height int) string {
 		grid[i] = make([]uint8, cols)
 	}
 
-	// Acende apenas o ponto mais alto de cada sub-coluna (sem preenchimento)
+	// Light only the highest dot of each sub-column, without fill.
 	setTopBit := func(colIdx, val int, bits [4]uint8) {
 		if val <= 0 {
 			return
@@ -284,11 +284,11 @@ func RenderSparkline(values []int, width, height int) string {
 	return sb.String()
 }
 
-// ─── Multi-linha ─────────────────────────────────────────────────────────────
+// ─── Multi-Line ──────────────────────────────────────────────────────────────
 
-// RenderMultiLine renderiza três métricas sobrepostas no mesmo gráfico braille.
-// Cada série é normalizada de forma independente para melhor visibilidade.
-// Prioridade de cor em conflito de célula: linhas > arquivos > pastas.
+// RenderMultiLine renders three overlaid metrics in the same braille chart.
+// Each series is normalized independently for better visibility.
+// Color priority on cell conflicts: lines > files > dirs.
 func RenderMultiLine(files, dirs, lines []int, width, height int) string {
 	if height < 2 {
 		height = 2
@@ -296,7 +296,7 @@ func RenderMultiLine(files, dirs, lines []int, width, height int) string {
 	chartRows := height - 1
 	maxValues := width * 2
 
-	// Ordem de desenho: dirs (menor prioridade) → files → lines (maior prioridade)
+	// Draw order: dirs (lowest priority) -> files -> lines (highest priority).
 	type series struct {
 		vals  []int
 		color string
@@ -381,7 +381,7 @@ func RenderMultiLine(files, dirs, lines []int, width, height int) string {
 		sb.WriteString(strings.Join(line, ""))
 	}
 	sb.WriteString("\n")
-	// Legenda substitui o eixo X
+	// The legend replaces the X-axis.
 	legendL := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPurple)).Render("─ lines")
 	legendF := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorBlue)).Render("─ files")
 	legendD := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorGreen)).Render("─ dirs")
@@ -391,8 +391,8 @@ func RenderMultiLine(files, dirs, lines []int, width, height int) string {
 
 // ─── Delta ───────────────────────────────────────────────────────────────────
 
-// RenderDelta renderiza a variação (Δ) entre amostras consecutivas.
-// Crescimento aparece acima da linha central (verde), queda abaixo (laranja).
+// RenderDelta renders the delta between consecutive samples.
+// Growth appears above the center line in green, decline below it in orange.
 func RenderDelta(values []int, width, height int) string {
 	if height < 2 {
 		height = 2
@@ -515,9 +515,9 @@ func RenderDelta(values []int, width, height int) string {
 	return sb.String()
 }
 
-// ─── Histograma horizontal ───────────────────────────────────────────────────
+// ─── Horizontal Histogram ────────────────────────────────────────────────────
 
-// formatAgo formata uma duração de offset como "-5s", "-2m", "-1h".
+// formatAgo formats an offset duration as "-5s", "-2m", or "-1h".
 func formatAgo(d time.Duration) string {
 	if d <= 0 {
 		return "now"
@@ -532,9 +532,9 @@ func formatAgo(d time.Duration) string {
 	return fmt.Sprintf("-%dh", s/3600)
 }
 
-// RenderHorizBar renderiza um histograma horizontal com barras de blocos.
-// Cada linha representa uma amostra; a mais recente fica no topo.
-// interval é o tempo real entre cada amostra, usado para calcular os labels de tempo.
+// RenderHorizBar renders a horizontal histogram using block bars.
+// Each row represents one sample, with the most recent at the top.
+// interval is the real time between samples and is used to compute time labels.
 func RenderHorizBar(values []int, width, height int, interval time.Duration) string {
 	if interval <= 0 {
 		interval = time.Second
@@ -547,22 +547,22 @@ func RenderHorizBar(values []int, width, height int, interval time.Duration) str
 		return blankBlock(width, height)
 	}
 
-	// Mostrar os últimos `height` samples (mais recente no topo)
+	// Show the last `height` samples, most recent first.
 	samples := values
 	if len(samples) > height {
 		samples = samples[len(samples)-height:]
 	}
 	n := len(samples)
 
-	// Calcular labelWidth dinamicamente pelo pior caso visível
+	// Compute labelWidth dynamically from the visible worst case.
 	maxOffset := time.Duration(n-1) * interval
 	labelWidth := len(formatAgo(maxOffset))
 	if labelWidth < len("now") {
 		labelWidth = len("now")
 	}
 
-	const valueWidth = 10 // número formatado alinhado à direita
-	// layout por linha: label + " " + bar + " " + value
+	const valueWidth = 10 // Right-aligned formatted number.
+	// Per-row layout: label + " " + bar + " " + value.
 	barArea := width - labelWidth - 2 - valueWidth
 	if barArea < 1 {
 		barArea = 1
@@ -577,7 +577,7 @@ func RenderHorizBar(values []int, width, height int, interval time.Duration) str
 		if i > 0 {
 			sb.WriteString("\n")
 		}
-		sampleIdx := n - 1 - i // índice 0 = mais recente no topo
+		sampleIdx := n - 1 - i // Index 0 is the most recent sample at the top.
 		if sampleIdx < 0 {
 			sb.WriteString(strings.Repeat(" ", width))
 			continue

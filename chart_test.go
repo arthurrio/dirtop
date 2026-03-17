@@ -10,12 +10,12 @@ func TestRender_EmptyInput(t *testing.T) {
 	result := Render([]int{}, 20, 5)
 	lines := strings.Split(result, "\n")
 
-	// Deve retornar exatamente `height` linhas
+	// It should return exactly `height` rows.
 	if len(lines) != 5 {
 		t.Errorf("esperado 5 linhas, obtido %d", len(lines))
 	}
 
-	// Cada linha deve ter largura width (espaços)
+	// Each row should have width characters made of spaces.
 	for i, line := range lines {
 		stripped := stripANSI(line)
 		if len([]rune(stripped)) != 20 {
@@ -56,8 +56,8 @@ func TestRender_OutputHeightMatchesParam(t *testing.T) {
 }
 
 func TestRender_TruncatesLongHistory(t *testing.T) {
-	// width=10 → suporta 20 valores (2 por célula braille)
-	// passar 30 valores não deve causar pânico
+	// width=10 -> supports 20 values (2 per braille cell).
+	// Passing 30 values should not panic.
 	values := make([]int, 30)
 	for i := range values {
 		values[i] = i * 10
@@ -69,7 +69,7 @@ func TestRender_TruncatesLongHistory(t *testing.T) {
 }
 
 func TestRender_ContainsBrailleChars(t *testing.T) {
-	// A single non-zero value should produce at least one braille character
+	// A single non-zero value should produce at least one braille character.
 	result := Render([]int{10}, 10, 5)
 	hasBraille := false
 	for _, r := range result {
@@ -84,14 +84,14 @@ func TestRender_ContainsBrailleChars(t *testing.T) {
 }
 
 func TestRender_MinHeight(t *testing.T) {
-	// height=1 should be clamped to 2
+	// height=1 should be clamped to 2.
 	result := Render([]int{5, 10}, 20, 1)
 	lines := strings.Split(result, "\n")
 	if len(lines) != 2 {
 		t.Errorf("height=1 deve produzir 2 linhas (mínimo), obtido %d", len(lines))
 	}
 
-	// height=2 should produce exactly 2 lines
+	// height=2 should produce exactly 2 lines.
 	result2 := Render([]int{5, 10}, 20, 2)
 	lines2 := strings.Split(result2, "\n")
 	if len(lines2) != 2 {
@@ -99,7 +99,7 @@ func TestRender_MinHeight(t *testing.T) {
 	}
 }
 
-// stripANSI remove sequências de escape ANSI de uma string.
+// stripANSI removes ANSI escape sequences from a string.
 func stripANSI(s string) string {
 	var result strings.Builder
 	inEscape := false
