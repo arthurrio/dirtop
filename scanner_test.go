@@ -122,26 +122,26 @@ func TestScan_DevModeIgnoresCommonDependencyAndIDEDirs(t *testing.T) {
 
 	nodeModules := filepath.Join(dir, "node_modules")
 	if err := os.Mkdir(nodeModules, 0755); err != nil {
-			t.Fatalf("failed to create node_modules: %v", err)
+		t.Fatalf("failed to create node_modules: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(nodeModules, "index.js"), []byte("console.log('x')\n"), 0644); err != nil {
-			t.Fatalf("failed to create file in node_modules: %v", err)
+		t.Fatalf("failed to create file in node_modules: %v", err)
 	}
 
 	ideaDir := filepath.Join(dir, ".idea")
 	if err := os.Mkdir(ideaDir, 0755); err != nil {
-			t.Fatalf("failed to create .idea: %v", err)
+		t.Fatalf("failed to create .idea: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(ideaDir, "workspace.xml"), []byte("<project />\n"), 0644); err != nil {
-			t.Fatalf("failed to create file in .idea: %v", err)
+		t.Fatalf("failed to create file in .idea: %v", err)
 	}
 
 	srcDir := filepath.Join(dir, "src")
 	if err := os.Mkdir(srcDir, 0755); err != nil {
-			t.Fatalf("failed to create src: %v", err)
+		t.Fatalf("failed to create src: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(srcDir, "main.ts"), []byte("const answer = 42\n"), 0644); err != nil {
-			t.Fatalf("failed to create file in src: %v", err)
+		t.Fatalf("failed to create file in src: %v", err)
 	}
 
 	stats := Scan(dir, ScanOptions{DevMode: true})
@@ -168,10 +168,10 @@ func TestScan_DevModeIgnoresGeneratedFilesAcrossEcosystems(t *testing.T) {
 
 	srcDir := filepath.Join(dir, "src")
 	if err := os.Mkdir(srcDir, 0755); err != nil {
-			t.Fatalf("failed to create src: %v", err)
+		t.Fatalf("failed to create src: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(srcDir, "main.go"), []byte("package main\n"), 0644); err != nil {
-			t.Fatalf("failed to create main.go: %v", err)
+		t.Fatalf("failed to create main.go: %v", err)
 	}
 
 	generatedFiles := []string{
@@ -213,10 +213,10 @@ func TestScan_DevModeDoesNotIgnoreCommonDirsWhenDisabled(t *testing.T) {
 
 	targetDir := filepath.Join(dir, "target")
 	if err := os.Mkdir(targetDir, 0755); err != nil {
-			t.Fatalf("failed to create target: %v", err)
+		t.Fatalf("failed to create target: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(targetDir, "app.jar"), []byte("jar-content\n"), 0644); err != nil {
-			t.Fatalf("failed to create app.jar: %v", err)
+		t.Fatalf("failed to create app.jar: %v", err)
 	}
 
 	stats := Scan(dir, ScanOptions{})
@@ -262,5 +262,86 @@ func TestScan_DevModeDoesNotIgnoreProjectConfigFiles(t *testing.T) {
 	}
 	if got := stats.ByExt[".toml"]; got == 0 {
 		t.Error(".toml project config should not be ignored with --dev")
+	}
+}
+
+func TestScan_IgnoresCustomDirsFromOptions(t *testing.T) {
+	dir := t.TempDir()
+
+	cacheDir := filepath.Join(dir, "cache-data")
+	if err := os.Mkdir(cacheDir, 0755); err != nil {
+		t.Fatalf("failed to create cache-data: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cacheDir, "snapshot.json"), []byte("{\"ok\":true}\n"), 0644); err != nil {
+		t.Fatalf("failed to create file in cache-data: %v", err)
+	}
+
+	srcDir := filepath.Join(dir, "src")
+	if err := os.Mkdir(srcDir, 0755); err != nil {
+		t.Fatalf("failed to create src: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(srcDir, "main.ts"), []byte("const answer = 42\n"), 0644); err != nil {
+		t.Fatalf("failed to create file in src: %v", err)
+	}
+
+	stats := Scan(dir, ScanOptions{IgnoreDirs: []string{"cache-data"}})
+
+	if stats.Files != 1 {
+		t.Errorf("expected 1 file with custom ignored dirs, got %d", stats.Files)
+	}
+	if stats.Dirs != 1 {
+		t.Errorf("expected 1 directory with custom ignored dirs, got %d", stats.Dirs)
+	}
+	if got := stats.ByExt[".ts"]; got != 1 {
+		t.Errorf("expected .ts=1 with custom ignored dirs, got %d", got)
+	}
+	if _, ok := stats.ByExt[".json"]; ok {
+		t.Error(".json from a custom ignored directory should not appear in ByExt")
+	}
+}
+
+func TestScan_CombinesDevModeAndCustomIgnoredDirs(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := os.Mkdir(filepath.Join(dir, "node_modules"), 0755); err != nil {
+		t.Fatalf("failed to create node_modules: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "node_modules", "index.js"), []byte("console.log('x')\n"), 0644); err != nil {
+		t.Fatalf("failed to create file in node_modules: %v", err)
+	}
+
+	if err := os.Mkdir(filepath.Join(dir, "generated"), 0755); err != nil {
+		t.Fatalf("failed to create generated: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "generated", "api.ts"), []byte("export const x = 1\n"), 0644); err != nil {
+		t.Fatalf("failed to create file in generated: %v", err)
+	}
+
+	if err := os.Mkdir(filepath.Join(dir, "src"), 0755); err != nil {
+		t.Fatalf("failed to create src: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "src", "main.go"), []byte("package main\n"), 0644); err != nil {
+		t.Fatalf("failed to create file in src: %v", err)
+	}
+
+	stats := Scan(dir, ScanOptions{
+		DevMode:    true,
+		IgnoreDirs: []string{"generated"},
+	})
+
+	if stats.Files != 1 {
+		t.Errorf("expected 1 file with dev mode plus custom ignored dirs, got %d", stats.Files)
+	}
+	if stats.Dirs != 1 {
+		t.Errorf("expected 1 directory with dev mode plus custom ignored dirs, got %d", stats.Dirs)
+	}
+	if got := stats.ByExt[".go"]; got != 1 {
+		t.Errorf("expected .go=1 with dev mode plus custom ignored dirs, got %d", got)
+	}
+	if _, ok := stats.ByExt[".ts"]; ok {
+		t.Error(".ts from a custom ignored directory should not appear in ByExt")
+	}
+	if _, ok := stats.ByExt[".js"]; ok {
+		t.Error(".js from node_modules should not appear in ByExt")
 	}
 }

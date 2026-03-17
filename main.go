@@ -19,6 +19,7 @@ var version = "dev"
 func main() {
 	flagVersion := flag.Bool("version", false, "print version and exit")
 	flagDev := flag.Bool("dev", false, "ignore common dependency, build, IDE, and cache directories")
+	flagIgnoreDirs := flag.String("ignore-dirs", "", "additional directory names to ignore, comma-separated (e.g. --ignore-dirs dist,coverage,tmp)")
 	flagInterval := flag.Int("i", 0, "starting refresh interval in seconds (e.g. -i 5)")
 	flagIntervals := flag.String("intervals", "", "available intervals in seconds, comma-separated (e.g. --intervals 1,5,10,30,60)")
 	flag.Parse()
@@ -45,7 +46,7 @@ func main() {
 
 	m := Model{
 		cwd:         cwd,
-		scanOpts:    ScanOptions{DevMode: *flagDev},
+		scanOpts:    ScanOptions{DevMode: *flagDev, IgnoreDirs: parseList(*flagIgnoreDirs)},
 		width:       80,
 		height:      24,
 		intervals:   intervals,
@@ -106,6 +107,28 @@ func parseIntervals(rawList string, startSecs int) []time.Duration {
 	}
 
 	return durations
+}
+
+// parseList parses a comma-separated list, trims whitespace, and removes duplicates.
+func parseList(raw string) []string {
+	if raw == "" {
+		return nil
+	}
+
+	seen := make(map[string]struct{})
+	var items []string
+	for _, part := range strings.Split(raw, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if _, ok := seen[part]; ok {
+			continue
+		}
+		seen[part] = struct{}{}
+		items = append(items, part)
+	}
+	return items
 }
 
 // findIntervalIdx returns the index of startSecs in the list, or 0 if not provided.

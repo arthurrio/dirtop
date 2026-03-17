@@ -98,7 +98,8 @@ var DefaultDevIgnoreExts = []string{
 
 // ScanOptions controls additional scan rules.
 type ScanOptions struct {
-	DevMode bool
+	DevMode    bool
+	IgnoreDirs []string
 }
 
 // Stats contains the metrics collected from a scan.
@@ -195,12 +196,12 @@ func Scan(path string, opts ScanOptions) Stats {
 }
 
 func shouldIgnoreEntry(name string, isDir bool, opts ScanOptions) bool {
-	if !opts.DevMode {
-		return false
+	if isDir {
+		return shouldIgnoreDir(name, opts)
 	}
 
-	if isDir {
-		return containsName(DefaultDevIgnoreDirs, name)
+	if !opts.DevMode {
+		return false
 	}
 
 	if containsName(DefaultDevIgnoreFiles, name) {
@@ -213,6 +214,16 @@ func shouldIgnoreEntry(name string, isDir bool, opts ScanOptions) bool {
 	}
 
 	return strings.HasSuffix(name, ".min.js.map")
+}
+
+func shouldIgnoreDir(name string, opts ScanOptions) bool {
+	if containsName(opts.IgnoreDirs, name) {
+		return true
+	}
+	if !opts.DevMode {
+		return false
+	}
+	return containsName(DefaultDevIgnoreDirs, name)
 }
 
 func containsName(names []string, target string) bool {
