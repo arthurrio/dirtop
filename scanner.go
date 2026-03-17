@@ -11,6 +11,96 @@ import (
 	"time"
 )
 
+// DefaultDevIgnoreDirs lista nomes de diretórios gerados, externos ou locais
+// que devem ser ignorados quando a CLI roda com --dev.
+var DefaultDevIgnoreDirs = []string{
+	".angular",
+	".cache",
+	".cxx",
+	".classpath",
+	".direnv",
+	".dart_tool",
+	".gradle",
+	".hg",
+	".idea",
+	".mvn",
+	".m2",
+	".mypy_cache",
+	".next",
+	".nox",
+	".npm",
+	".nuxt",
+	".parcel-cache",
+	".pnpm-store",
+	".project",
+	".pytest_cache",
+	".ruff_cache",
+	".settings",
+	".svelte-kit",
+	".svn",
+	".stack-work",
+	".terraform",
+	".tox",
+	".turbo",
+	".venv",
+	".vite",
+	".vs",
+	".vscode",
+	".yarn",
+	"_build",
+	"__pycache__",
+	"CMakeFiles",
+	"DerivedData",
+	"Pods",
+	"bin",
+	"build",
+	"coverage",
+	"cmake-build-debug",
+	"cmake-build-release",
+	"deps",
+	"dist",
+	"log",
+	"logs",
+	"node_modules",
+	"obj",
+	"out",
+	"site",
+	"target",
+	"temp",
+	"tmp",
+	"vendor",
+	"venv",
+}
+
+// DefaultDevIgnoreFiles lista arquivos ou padrões de arquivo gerados/local-only
+// que devem ser ignorados quando a CLI roda com --dev.
+var DefaultDevIgnoreFiles = []string{
+	".DS_Store",
+	".flutter-plugins",
+	".flutter-plugins-dependencies",
+}
+
+// DefaultDevIgnoreExts lista extensões geradas que devem ser ignoradas com --dev.
+var DefaultDevIgnoreExts = []string{
+	".class",
+	".dll",
+	".dylib",
+	".exe",
+	".iml",
+	".o",
+	".obj",
+	".pyd",
+	".pyc",
+	".pyo",
+	".so",
+	".test",
+}
+
+// ScanOptions controla regras adicionais de varredura.
+type ScanOptions struct {
+	DevMode bool
+}
+
 // Stats contém as métricas coletadas de uma varredura.
 type Stats struct {
 	Files    int
@@ -26,7 +116,7 @@ type ScanMsg Stats
 // Scan percorre o diretório path e retorna as métricas coletadas.
 // A varredura tem timeout de 5 segundos; se expirar, retorna dados parciais
 // com Stats.Scanning = true.
-func Scan(path string) Stats {
+func Scan(path string, opts ScanOptions) Stats {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -52,6 +142,13 @@ func Scan(path string) Stats {
 
 		// Ignorar entradas ocultas
 		if strings.HasPrefix(name, ".") {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		if shouldIgnoreEntry(name, d.IsDir(), opts) {
 			if d.IsDir() {
 				return filepath.SkipDir
 			}
@@ -95,6 +192,36 @@ func Scan(path string) Stats {
 	})
 
 	return stats
+}
+
+func shouldIgnoreEntry(name string, isDir bool, opts ScanOptions) bool {
+	if !opts.DevMode {
+		return false
+	}
+
+	if isDir {
+		return containsName(DefaultDevIgnoreDirs, name)
+	}
+
+	if containsName(DefaultDevIgnoreFiles, name) {
+		return true
+	}
+
+	ext := filepath.Ext(name)
+	if ext != "" && containsName(DefaultDevIgnoreExts, ext) {
+		return true
+	}
+
+	return strings.HasSuffix(name, ".min.js.map")
+}
+
+func containsName(names []string, target string) bool {
+	for _, name := range names {
+		if name == target {
+			return true
+		}
+	}
+	return false
 }
 
 // isTextFile retorna true se o arquivo não contiver byte nulo nos primeiros 512 bytes.

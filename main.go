@@ -18,6 +18,7 @@ var version = "dev"
 
 func main() {
 	flagVersion := flag.Bool("version", false, "print version and exit")
+	flagDev := flag.Bool("dev", false, "ignore common dependency, build, IDE, and cache directories")
 	flagInterval := flag.Int("i", 0, "starting refresh interval in seconds (e.g. -i 5)")
 	flagIntervals := flag.String("intervals", "", "available intervals in seconds, comma-separated (e.g. --intervals 1,5,10,30,60)")
 	flag.Parse()
@@ -44,6 +45,7 @@ func main() {
 
 	m := Model{
 		cwd:         cwd,
+		scanOpts:    ScanOptions{DevMode: *flagDev},
 		width:       80,
 		height:      24,
 		intervals:   intervals,

@@ -44,6 +44,7 @@ type Model struct {
 	history     []Stats
 	current     Stats
 	cwd         string
+	scanOpts    ScanOptions
 	width       int
 	height      int
 	chartMode   ChartMode
@@ -87,13 +88,13 @@ func formatInterval(d time.Duration) string {
 
 // Init dispara a primeira varredura imediatamente, sem esperar 1 segundo.
 func (m Model) Init() tea.Cmd {
-	return scanCmd(m.cwd)
+	return scanCmd(m.cwd, m.scanOpts)
 }
 
 // scanCmd retorna um tea.Cmd que executa a varredura no path especificado.
-func scanCmd(path string) tea.Cmd {
+func scanCmd(path string, opts ScanOptions) tea.Cmd {
 	return func() tea.Msg {
-		return ScanMsg(Scan(path))
+		return ScanMsg(Scan(path, opts))
 	}
 }
 
@@ -108,7 +109,7 @@ func tickCmd(d time.Duration) tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tickMsg:
-		return m, scanCmd(m.cwd)
+		return m, scanCmd(m.cwd, m.scanOpts)
 
 	case ScanMsg:
 		stats := Stats(msg)
