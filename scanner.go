@@ -11,22 +11,113 @@ import (
 	"time"
 )
 
-// Stats contém as métricas coletadas de uma varredura.
+// DefaultDevIgnoreDirs lists generated, external, or local-only directories
+// that should be ignored when the CLI runs with --dev.
+var DefaultDevIgnoreDirs = []string{
+	".angular",
+	".cache",
+	".cxx",
+	".classpath",
+	".direnv",
+	".dart_tool",
+	".gradle",
+	".hg",
+	".idea",
+	".mvn",
+	".m2",
+	".mypy_cache",
+	".next",
+	".nox",
+	".npm",
+	".nuxt",
+	".parcel-cache",
+	".pnpm-store",
+	".project",
+	".pytest_cache",
+	".ruff_cache",
+	".settings",
+	".svelte-kit",
+	".svn",
+	".stack-work",
+	".terraform",
+	".tox",
+	".turbo",
+	".venv",
+	".vite",
+	".vs",
+	".vscode",
+	".yarn",
+	"_build",
+	"__pycache__",
+	"CMakeFiles",
+	"DerivedData",
+	"Pods",
+	"bin",
+	"build",
+	"coverage",
+	"cmake-build-debug",
+	"cmake-build-release",
+	"deps",
+	"dist",
+	"log",
+	"logs",
+	"node_modules",
+	"obj",
+	"out",
+	"site",
+	"target",
+	"temp",
+	"tmp",
+	"vendor",
+	"venv",
+}
+
+// DefaultDevIgnoreFiles lists generated or local-only file names
+// that should be ignored when the CLI runs with --dev.
+var DefaultDevIgnoreFiles = []string{
+	".DS_Store",
+	".flutter-plugins",
+	".flutter-plugins-dependencies",
+}
+
+// DefaultDevIgnoreExts lists generated file extensions that should be ignored with --dev.
+var DefaultDevIgnoreExts = []string{
+	".class",
+	".dll",
+	".dylib",
+	".exe",
+	".iml",
+	".o",
+	".obj",
+	".pyd",
+	".pyc",
+	".pyo",
+	".so",
+	".test",
+}
+
+// ScanOptions controls additional scan rules.
+type ScanOptions struct {
+	DevMode    bool
+	IgnoreDirs []string
+}
+
+// Stats contains the metrics collected from a scan.
 type Stats struct {
 	Files    int
 	Dirs     int
 	Lines    int
-	ByExt    map[string]int // ".go" → linhas; "(no ext)" para sem extensão
-	Scanning bool           // true se varredura foi interrompida por timeout
+	ByExt    map[string]int // ".go" -> lines; "(no ext)" for files without an extension
+	Scanning bool           // true if the scan was interrupted by timeout
 }
 
-// ScanMsg é enviada ao modelo bubbletea após uma varredura.
+// ScanMsg is sent to the Bubble Tea model after a scan completes.
 type ScanMsg Stats
 
-// Scan percorre o diretório path e retorna as métricas coletadas.
-// A varredura tem timeout de 5 segundos; se expirar, retorna dados parciais
-// com Stats.Scanning = true.
-func Scan(path string) Stats {
+// Scan walks the given path and returns the collected metrics.
+// The scan has a 5-second timeout; if it expires, it returns partial data
+// with Stats.Scanning = true.
+func Scan(path string, opts ScanOptions) Stats {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -35,7 +126,7 @@ func Scan(path string) Stats {
 	}
 
 	filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
-		// Verificar timeout
+		// Check for timeout.
 		select {
 		case <-ctx.Done():
 			stats.Scanning = true
@@ -43,14 +134,14 @@ func Scan(path string) Stats {
 		default:
 		}
 
-		// Silenciar todos os erros de I/O
+		// Silence all I/O errors.
 		if err != nil {
 			return nil
 		}
 
 		name := d.Name()
 
-		// Ignorar entradas ocultas
+		// Ignore hidden entries.
 		if strings.HasPrefix(name, ".") {
 			if d.IsDir() {
 				return filepath.SkipDir
@@ -58,20 +149,27 @@ func Scan(path string) Stats {
 			return nil
 		}
 
-		// Ignorar symlinks
+		if shouldIgnoreEntry(name, d.IsDir(), opts) {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		// Ignore symlinks.
 		if d.Type()&fs.ModeSymlink != 0 {
 			return nil
 		}
 
 		if d.IsDir() {
-			// Não contar o diretório raiz
+			// Do not count the root directory.
 			if p != path {
 				stats.Dirs++
 			}
 			return nil
 		}
 
-		// É um arquivo regular
+		// Regular file.
 		stats.Files++
 
 		ext := filepath.Ext(name)
@@ -79,13 +177,13 @@ func Scan(path string) Stats {
 			ext = "(no ext)"
 		}
 
-		// Detectar se é texto
+		// Detect whether the file is text.
 		if isTextFile(p) {
 			lines := countLines(ctx, p)
 			stats.Lines += lines
 			stats.ByExt[ext] += lines
 		} else {
-			// Arquivo binário: conta no mapa com 0 linhas (garante chave presente)
+			// Binary file: keep the extension in the map with 0 lines.
 			if _, ok := stats.ByExt[ext]; !ok {
 				stats.ByExt[ext] = 0
 			}
@@ -97,7 +195,47 @@ func Scan(path string) Stats {
 	return stats
 }
 
-// isTextFile retorna true se o arquivo não contiver byte nulo nos primeiros 512 bytes.
+func shouldIgnoreEntry(name string, isDir bool, opts ScanOptions) bool {
+	if isDir {
+		return shouldIgnoreDir(name, opts)
+	}
+
+	if !opts.DevMode {
+		return false
+	}
+
+	if containsName(DefaultDevIgnoreFiles, name) {
+		return true
+	}
+
+	ext := filepath.Ext(name)
+	if ext != "" && containsName(DefaultDevIgnoreExts, ext) {
+		return true
+	}
+
+	return strings.HasSuffix(name, ".min.js.map")
+}
+
+func shouldIgnoreDir(name string, opts ScanOptions) bool {
+	if containsName(opts.IgnoreDirs, name) {
+		return true
+	}
+	if !opts.DevMode {
+		return false
+	}
+	return containsName(DefaultDevIgnoreDirs, name)
+}
+
+func containsName(names []string, target string) bool {
+	for _, name := range names {
+		if name == target {
+			return true
+		}
+	}
+	return false
+}
+
+// isTextFile returns true if the file does not contain a NUL byte in the first 512 bytes.
 func isTextFile(path string) bool {
 	f, err := os.Open(path)
 	if err != nil {
@@ -120,7 +258,7 @@ func isTextFile(path string) bool {
 	return true
 }
 
-// countLines conta o número de linhas de um arquivo texto.
+// countLines counts the number of lines in a text file.
 func countLines(ctx context.Context, path string) int {
 	f, err := os.Open(path)
 	if err != nil {
