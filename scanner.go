@@ -13,40 +13,9 @@ import (
 
 // DefaultDevIgnoreDirs lists generated, external, or local-only directories
 // that should be ignored when the CLI runs with --dev.
+// Note: hidden directories (prefixed with ".") are already skipped by the
+// scanner, so they do not need to appear here.
 var DefaultDevIgnoreDirs = []string{
-	".angular",
-	".cache",
-	".cxx",
-	".classpath",
-	".direnv",
-	".dart_tool",
-	".gradle",
-	".hg",
-	".idea",
-	".mvn",
-	".m2",
-	".mypy_cache",
-	".next",
-	".nox",
-	".npm",
-	".nuxt",
-	".parcel-cache",
-	".pnpm-store",
-	".project",
-	".pytest_cache",
-	".ruff_cache",
-	".settings",
-	".svelte-kit",
-	".svn",
-	".stack-work",
-	".terraform",
-	".tox",
-	".turbo",
-	".venv",
-	".vite",
-	".vs",
-	".vscode",
-	".yarn",
 	"_build",
 	"__pycache__",
 	"CMakeFiles",
@@ -70,14 +39,6 @@ var DefaultDevIgnoreDirs = []string{
 	"tmp",
 	"vendor",
 	"venv",
-}
-
-// DefaultDevIgnoreFiles lists generated or local-only file names
-// that should be ignored when the CLI runs with --dev.
-var DefaultDevIgnoreFiles = []string{
-	".DS_Store",
-	".flutter-plugins",
-	".flutter-plugins-dependencies",
 }
 
 // DefaultDevIgnoreExts lists generated file extensions that should be ignored with --dev.
@@ -202,10 +163,6 @@ func shouldIgnoreEntry(name string, isDir bool, opts ScanOptions) bool {
 
 	if !opts.DevMode {
 		return false
-	}
-
-	if containsName(DefaultDevIgnoreFiles, name) {
-		return true
 	}
 
 	ext := filepath.Ext(name)

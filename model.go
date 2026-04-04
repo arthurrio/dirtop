@@ -210,6 +210,9 @@ func (m Model) View() string {
 
 	// Calculate extension rows, limited by the available space.
 	extCount := len(m.current.ByExt)
+	if extCount > 5 {
+		extCount = 5
+	}
 	extRows := (extCount + 1) / 2 // 2 columns per row
 	if extRows < 1 {
 		extRows = 1
@@ -288,6 +291,11 @@ func renderExtensions(byExt map[string]int, width int) string {
 	})
 	if noExt != nil {
 		entries = append(entries, *noExt)
+	}
+
+	const maxExtensions = 5
+	if len(entries) > maxExtensions {
+		entries = entries[:maxExtensions]
 	}
 
 	leftColWidth := (width - 1) / 2

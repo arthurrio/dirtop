@@ -114,8 +114,8 @@ dirtop --intervals 1,10,60
 dirtop -i 10 --intervals 1,10,60 ~/code/myproject
 ```
 
-With `--dev`, `dirtop` skips common development-only paths such as `node_modules`, `vendor`, `target`, `.gradle`, `.terraform`, `__pycache__`, `.idea`, `.vscode`, `dist`, `build`, and generated files like `*.iml`, `*.class`, `*.so`, and `*.min.js.map`. Project config files such as `package.json`, `pom.xml`, `Cargo.toml`, and `tsconfig.json` are still counted.
-The full directory list ignored by `--dev` is defined in [scanner.go](/home/thurrio/workspace/dirtop/scanner.go#L14).
+With `--dev`, `dirtop` skips common development-only paths such as `node_modules`, `vendor`, `target`, `__pycache__`, `dist`, `build`, and generated files like `*.iml`, `*.class`, `*.so`, and `*.min.js.map`. Hidden directories (e.g. `.git`, `.idea`, `.vscode`) are always ignored regardless of `--dev`. Project config files such as `package.json`, `pom.xml`, `Cargo.toml`, and `tsconfig.json` are still counted.
+The full directory list ignored by `--dev` is defined in [scanner.go](scanner.go).
 
 ## Keyboard shortcuts
 
