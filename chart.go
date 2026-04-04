@@ -533,12 +533,9 @@ func formatAgo(d time.Duration) string {
 }
 
 // RenderHorizBar renders a horizontal histogram using block bars.
-// Each row represents one sample, with the most recent at the top.
-// interval is the real time between samples and is used to compute time labels.
-func RenderHorizBar(values []int, width, height int, interval time.Duration) string {
-	if interval <= 0 {
-		interval = time.Second
-	}
+// Each row represents a change snapshot, with the most recent at the top.
+// timestamps holds the real time each snapshot was taken; now is the reference.
+func RenderHorizBar(values []int, timestamps []time.Time, width, height int, now time.Time) string {
 	if height < 1 {
 		height = 1
 	}
@@ -548,22 +545,28 @@ func RenderHorizBar(values []int, width, height int, interval time.Duration) str
 	}
 
 	// Show the last `height` samples, most recent first.
-	samples := values
-	if len(samples) > height {
-		samples = samples[len(samples)-height:]
+	start := 0
+	if len(values) > height {
+		start = len(values) - height
 	}
+	samples := values[start:]
+	times := timestamps[start:]
 	n := len(samples)
 
-	// Compute labelWidth dynamically from the visible worst case.
-	maxOffset := time.Duration(n-1) * interval
+	// Compute labelWidth from the oldest visible timestamp.
+	var maxOffset time.Duration
+	if n > 0 {
+		maxOffset = now.Sub(times[0])
+	}
 	labelWidth := len(formatAgo(maxOffset))
 	if labelWidth < len("now") {
 		labelWidth = len("now")
 	}
 
+	const deltaWidth = 12 // Space for delta indicator like " +1.234".
 	const valueWidth = 10 // Right-aligned formatted number.
-	// Per-row layout: label + " " + bar + " " + value.
-	barArea := width - labelWidth - 2 - valueWidth
+	// Per-row layout: label + " " + bar + " " + value + delta.
+	barArea := width - labelWidth - 2 - valueWidth - deltaWidth
 	if barArea < 1 {
 		barArea = 1
 	}
@@ -571,31 +574,47 @@ func RenderHorizBar(values []int, width, height int, interval time.Duration) str
 	styleLabel := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorGray))
 	styleBar := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPurple))
 	styleValue := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPurple))
+	stylePlus := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorGreen))
+	styleMinus := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorOrange))
 
 	var sb strings.Builder
 	for i := 0; i < height; i++ {
 		if i > 0 {
 			sb.WriteString("\n")
 		}
-		sampleIdx := n - 1 - i // Index 0 is the most recent sample at the top.
+		sampleIdx := n - 1 - i // Most recent at the top.
 		if sampleIdx < 0 {
 			sb.WriteString(strings.Repeat(" ", width))
 			continue
 		}
 
 		val := samples[sampleIdx]
-		offset := time.Duration(n-1-sampleIdx) * interval
+		offset := now.Sub(times[sampleIdx])
 		label := fmt.Sprintf("%*s", labelWidth, formatAgo(offset))
 
 		barLen := val * barArea / maxVal
 		bar := strings.Repeat("█", barLen) + strings.Repeat(" ", barArea-barLen)
 		valueStr := fmt.Sprintf("%*s", valueWidth, formatNumber(val))
 
+		// Delta indicator relative to the previous snapshot.
+		deltaStr := strings.Repeat(" ", deltaWidth)
+		if sampleIdx > 0 {
+			diff := val - samples[sampleIdx-1]
+			if diff > 0 {
+				deltaStr = fmt.Sprintf("%*s", deltaWidth, "+"+formatNumber(diff))
+				deltaStr = stylePlus.Render(deltaStr)
+			} else if diff < 0 {
+				deltaStr = fmt.Sprintf("%*s", deltaWidth, formatNumber(diff))
+				deltaStr = styleMinus.Render(deltaStr)
+			}
+		}
+
 		sb.WriteString(styleLabel.Render(label))
 		sb.WriteString(" ")
 		sb.WriteString(styleBar.Render(bar))
 		sb.WriteString(" ")
 		sb.WriteString(styleValue.Render(valueStr))
+		sb.WriteString(deltaStr)
 	}
 	return sb.String()
 }
