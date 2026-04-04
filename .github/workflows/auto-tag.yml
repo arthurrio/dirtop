@@ -1,0 +1,80 @@
+name: Auto Tag
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  tag:
+    name: Create version tag
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.TAP_GITHUB_TOKEN }}
+
+      - name: Get latest tag
+        id: latest
+        run: |
+          tag=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+          echo "tag=${tag:-v0.0.0}" >> "$GITHUB_OUTPUT"
+
+      - name: Determine bump type
+        id: bump
+        run: |
+          latest="${{ steps.latest.outputs.tag }}"
+          log=$(git log "${latest}..HEAD" --pretty=format:"%s" 2>/dev/null || git log --pretty=format:"%s")
+
+          # Skip tagging when all commits are non-releasable (docs, ci, chore, style, test)
+          if ! echo "$log" | grep -qvE '^(docs|ci|chore|style|test)[:(]'; then
+            echo "type=skip" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if echo "$log" | grep -qE '!:|^BREAKING CHANGE'; then
+            echo "type=major" >> "$GITHUB_OUTPUT"
+          elif echo "$log" | grep -qE '^feat[:(]'; then
+            echo "type=minor" >> "$GITHUB_OUTPUT"
+          else
+            echo "type=patch" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Compute next version
+        if: steps.bump.outputs.type != 'skip'
+        id: next
+        run: |
+          latest="${{ steps.latest.outputs.tag }}"
+          bump="${{ steps.bump.outputs.type }}"
+
+          version="${latest#v}"
+          IFS='.' read -r major minor patch <<< "$version"
+
+          case "$bump" in
+            major) major=$((major + 1)); minor=0; patch=0 ;;
+            minor) minor=$((minor + 1)); patch=0 ;;
+            patch) patch=$((patch + 1)) ;;
+          esac
+
+          echo "tag=v${major}.${minor}.${patch}" >> "$GITHUB_OUTPUT"
+
+      - name: Check tag does not exist
+        if: steps.bump.outputs.type != 'skip'
+        id: check
+        run: |
+          next="${{ steps.next.outputs.tag }}"
+          if git rev-parse "$next" >/dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create and push tag
+        if: steps.bump.outputs.type != 'skip' && steps.check.outputs.skip == 'false'
+        run: |
+          next="${{ steps.next.outputs.tag }}"
+          git tag "$next"
+          git push origin "$next"
