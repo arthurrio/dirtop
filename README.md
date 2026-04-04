@@ -2,20 +2,7 @@
 
 A real-time terminal dashboard for monitoring directories. Tracks file count, directory count, lines of code, and file extension breakdown — with a live history chart that updates as your codebase evolves.
 
-```
- ▶ dirtop  [~/code/myproject]  ↺ 1s
-  files  312    │  dirs  47    │  lines  18,432
-────────────────────────────────────────────────────────────────────────────────
- HISTORY  [c: area]  [m: lines]
-⣀⣀⣤⣤⣶⣶⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
-⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
-t=0s────────────────────────────────────────────────────────────────────now
-────────────────────────────────────────────────────────────────────────────────
- EXTENSIONS
- .go              12,104    .md               2,341
- .json             2,891    .yaml               891
- .sh                 205    (no ext)             --
-```
+<img width="1254" height="681" alt="image" src="https://github.com/user-attachments/assets/0f38b7a9-6c40-4569-a728-10a5f80adf21" />
 
 ## Features
 
