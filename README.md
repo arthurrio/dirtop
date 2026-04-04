@@ -45,6 +45,29 @@ go build -o dirtop .
 sudo mv dirtop /usr/local/bin/
 ```
 
+## Updating
+
+### Homebrew
+
+```bash
+brew update
+brew upgrade dirtop
+```
+
+### Using Go
+
+```bash
+go install github.com/arthurrio/dirtop@latest
+```
+
+### Manual / install.sh
+
+Re-run the install script or download the latest binary from the [releases page](https://github.com/arthurrio/dirtop/releases/latest):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/arthurrio/dirtop/main/install.sh | bash
+```
+
 ## Uninstall
 
 ### Homebrew
