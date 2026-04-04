@@ -18,6 +18,8 @@ var version = "dev"
 
 func main() {
 	flagVersion := flag.Bool("version", false, "print version and exit")
+	flagDev := flag.Bool("dev", false, "ignore common dependency, build, IDE, and cache directories")
+	flagIgnoreDirs := flag.String("ignore-dirs", "", "additional directory names to ignore, comma-separated (e.g. --ignore-dirs dist,coverage,tmp)")
 	flagInterval := flag.Int("i", 0, "starting refresh interval in seconds (e.g. -i 5)")
 	flagIntervals := flag.String("intervals", "", "available intervals in seconds, comma-separated (e.g. --intervals 1,5,10,30,60)")
 	flag.Parse()
@@ -27,13 +29,13 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Verificar acesso ao diretório atual antes de iniciar a TUI
+	// Check access to the current directory before starting the TUI.
 	if _, err := os.ReadDir("."); err != nil {
 		fmt.Fprintf(os.Stderr, "error: cannot access current directory: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Resolver path absoluto para exibição
+	// Resolve the absolute path for display.
 	cwd, err := os.Getwd()
 	if err != nil {
 		cwd = "."
@@ -44,6 +46,7 @@ func main() {
 
 	m := Model{
 		cwd:         cwd,
+		scanOpts:    ScanOptions{DevMode: *flagDev, IgnoreDirs: parseList(*flagIgnoreDirs)},
 		width:       80,
 		height:      24,
 		intervals:   intervals,
@@ -57,9 +60,9 @@ func main() {
 	}
 }
 
-// parseIntervals constrói a lista de intervalos a partir das flags.
-// Se --intervals for fornecido, usa essa lista; caso contrário usa DefaultIntervals.
-// Se -i for fornecido e não estiver na lista, insere-o na posição correta.
+// parseIntervals builds the interval list from the CLI flags.
+// If --intervals is provided, it uses that list; otherwise it uses DefaultIntervals.
+// If -i is provided and missing from the list, it inserts it in sorted order.
 func parseIntervals(rawList string, startSecs int) []time.Duration {
 	var durations []time.Duration
 
@@ -83,11 +86,11 @@ func parseIntervals(rawList string, startSecs int) []time.Duration {
 		copy(durations, DefaultIntervals)
 	}
 
-	// Garantir ordenação e unicidade
+	// Ensure sorting and uniqueness.
 	sort.Slice(durations, func(i, j int) bool { return durations[i] < durations[j] })
 	durations = dedupDurations(durations)
 
-	// Inserir -i na lista caso não esteja presente
+	// Insert -i into the list if it is not already present.
 	if startSecs > 0 {
 		target := time.Duration(startSecs) * time.Second
 		found := false
@@ -106,7 +109,29 @@ func parseIntervals(rawList string, startSecs int) []time.Duration {
 	return durations
 }
 
-// findIntervalIdx retorna o índice de startSecs na lista, ou 0 se não fornecido.
+// parseList parses a comma-separated list, trims whitespace, and removes duplicates.
+func parseList(raw string) []string {
+	if raw == "" {
+		return nil
+	}
+
+	seen := make(map[string]struct{})
+	var items []string
+	for _, part := range strings.Split(raw, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if _, ok := seen[part]; ok {
+			continue
+		}
+		seen[part] = struct{}{}
+		items = append(items, part)
+	}
+	return items
+}
+
+// findIntervalIdx returns the index of startSecs in the list, or 0 if not provided.
 func findIntervalIdx(intervals []time.Duration, startSecs int) int {
 	if startSecs <= 0 {
 		return 0
@@ -120,7 +145,7 @@ func findIntervalIdx(intervals []time.Duration, startSecs int) int {
 	return 0
 }
 
-// dedupDurations remove durações duplicadas de uma slice já ordenada.
+// dedupDurations removes duplicate durations from an already sorted slice.
 func dedupDurations(ds []time.Duration) []time.Duration {
 	if len(ds) == 0 {
 		return ds

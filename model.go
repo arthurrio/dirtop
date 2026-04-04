@@ -12,12 +12,12 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// tickMsg sinaliza que é hora de iniciar uma nova varredura.
+// tickMsg signals that it is time to start a new scan.
 type tickMsg time.Time
 
 const historyMaxLen = 3600
 
-// DefaultIntervals é a lista padrão de intervalos de atualização.
+// DefaultIntervals is the default list of refresh intervals.
 var DefaultIntervals = []time.Duration{
 	1 * time.Second,
 	5 * time.Second,
@@ -26,33 +26,34 @@ var DefaultIntervals = []time.Duration{
 	60 * time.Second,
 }
 
-// metricDef descreve uma métrica exibível no gráfico.
+// metricDef describes a chartable metric.
 type metricDef struct {
 	name  string
 	color string
 }
 
-// chartMetrics lista as métricas disponíveis para o gráfico (single-metric).
+// chartMetrics lists the metrics available for the single-metric chart.
 var chartMetrics = [3]metricDef{
 	{"lines", ColorPurple},
 	{"files", ColorBlue},
 	{"dirs", ColorGreen},
 }
 
-// Model é o estado da aplicação bubbletea.
+// Model holds the Bubble Tea application state.
 type Model struct {
 	history     []Stats
 	current     Stats
 	cwd         string
+	scanOpts    ScanOptions
 	width       int
 	height      int
 	chartMode   ChartMode
 	intervals   []time.Duration
 	intervalIdx int
-	metricIdx   int // index in chartMetrics; ignored in multi mode
+	metricIdx   int // Index in chartMetrics; ignored in multi mode.
 }
 
-// interval retorna o intervalo de atualização atual, com fallback seguro.
+// interval returns the current refresh interval with a safe fallback.
 func (m Model) interval() time.Duration {
 	if len(m.intervals) == 0 {
 		return time.Second
@@ -60,7 +61,7 @@ func (m Model) interval() time.Duration {
 	return m.intervals[m.intervalIdx]
 }
 
-// metricValues extrai do histórico os valores da métrica atualmente selecionada.
+// metricValues extracts the currently selected metric values from the history.
 func (m Model) metricValues() []int {
 	vals := make([]int, len(m.history))
 	for i, s := range m.history {
@@ -76,7 +77,7 @@ func (m Model) metricValues() []int {
 	return vals
 }
 
-// formatInterval formata uma duração como "1s", "30s", "1m", "5m".
+// formatInterval formats a duration as "1s", "30s", "1m", or "5m".
 func formatInterval(d time.Duration) string {
 	s := int(d.Seconds())
 	if s < 60 {
@@ -85,30 +86,30 @@ func formatInterval(d time.Duration) string {
 	return fmt.Sprintf("%dm", s/60)
 }
 
-// Init dispara a primeira varredura imediatamente, sem esperar 1 segundo.
+// Init triggers the first scan immediately instead of waiting one second.
 func (m Model) Init() tea.Cmd {
-	return scanCmd(m.cwd)
+	return scanCmd(m.cwd, m.scanOpts)
 }
 
-// scanCmd retorna um tea.Cmd que executa a varredura no path especificado.
-func scanCmd(path string) tea.Cmd {
+// scanCmd returns a tea.Cmd that scans the specified path.
+func scanCmd(path string, opts ScanOptions) tea.Cmd {
 	return func() tea.Msg {
-		return ScanMsg(Scan(path))
+		return ScanMsg(Scan(path, opts))
 	}
 }
 
-// tickCmd agenda um tick após a duração especificada.
+// tickCmd schedules a tick after the specified duration.
 func tickCmd(d time.Duration) tea.Cmd {
 	return tea.Tick(d, func(t time.Time) tea.Msg {
 		return tickMsg(t)
 	})
 }
 
-// Update processa mensagens e atualiza o estado.
+// Update processes messages and updates the state.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tickMsg:
-		return m, scanCmd(m.cwd)
+		return m, scanCmd(m.cwd, m.scanOpts)
 
 	case ScanMsg:
 		stats := Stats(msg)
@@ -144,7 +145,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// View renderiza o dashboard completo.
+// View renders the full dashboard.
 func (m Model) View() string {
 	if m.width < 40 || m.height < 10 {
 		return lipgloss.Place(m.width, m.height,
@@ -155,7 +156,7 @@ func (m Model) View() string {
 
 	var sb strings.Builder
 
-	// --- Linha de status ---
+	// --- Status line ---
 	indicator := StyleGray.Render(fmt.Sprintf("↺ %s [i]", formatInterval(m.interval())))
 	if m.current.Scanning {
 		indicator = StyleOrange.Render("↺ scanning...")
@@ -167,11 +168,11 @@ func (m Model) View() string {
 	sb.WriteString(statusLine)
 	sb.WriteString("\n")
 
-	// --- Métricas inline ---
-	// A métrica ativa no gráfico (single-metric) é destacada com sua própria cor no label.
+	// --- Inline metrics ---
+	// The active single-metric chart entry is highlighted in its own color.
 	active := m.metricIdx
 	if m.chartMode == ChartMultiLine {
-		active = -1 // nenhuma destacada individualmente no modo multi
+		active = -1 // No individually highlighted metric in multi mode.
 	}
 	labelFiles := StyleGray.Render("files")
 	labelDirs := StyleGray.Render("│  dirs")
@@ -194,27 +195,30 @@ func (m Model) View() string {
 	sb.WriteString(metricsLine)
 	sb.WriteString("\n")
 
-	// --- Separador ---
+	// --- Separator ---
 	sb.WriteString(StyleGray.Render(strings.Repeat("─", m.width)))
 	sb.WriteString("\n")
 
-	// --- Histórico / Gráfico ---
+	// --- History / Chart ---
 	metricHint := fmt.Sprintf("  [m: %s]", chartMetrics[m.metricIdx].name)
 	if m.chartMode == ChartMultiLine {
-		metricHint = "" // multi mode shows all three, hint does not apply
+		metricHint = "" // Multi mode shows all three metrics, so the hint does not apply.
 	}
 	histLabel := fmt.Sprintf(" HISTORY  [c: %s]%s", m.chartMode.Name(), metricHint)
 	sb.WriteString(StyleGray.Render(histLabel))
 	sb.WriteString("\n")
 
-	// Calcular linhas de extensões (limitado ao espaço disponível)
+	// Calculate extension rows, limited by the available space.
 	extCount := len(m.current.ByExt)
-	extRows := (extCount + 1) / 2 // 2 colunas por linha
+	if extCount > 5 {
+		extCount = 5
+	}
+	extRows := (extCount + 1) / 2 // 2 columns per row
 	if extRows < 1 {
 		extRows = 1
 	}
 
-	// Overhead fixo: status(1) + metrics(1) + sep(1) + HISTÓRICO(1) + \n pós-chart(1) + sep(1) + EXTENSÕES(1) = 7
+	// Fixed overhead: status(1) + metrics(1) + sep(1) + HISTORY(1) + \n after chart(1) + sep(1) + EXTENSIONS(1) = 7
 	const fixedOverhead = 7
 	chartHeight := m.height - fixedOverhead - extRows
 	if chartHeight < 5 {
@@ -247,11 +251,11 @@ func (m Model) View() string {
 	sb.WriteString(chartStr)
 	sb.WriteString("\n")
 
-	// --- Separador ---
+	// --- Separator ---
 	sb.WriteString(StyleGray.Render(strings.Repeat("─", m.width)))
 	sb.WriteString("\n")
 
-	// --- Extensões ---
+	// --- Extensions ---
 	sb.WriteString(StyleGray.Render(" EXTENSIONS"))
 	sb.WriteString("\n")
 	sb.WriteString(renderExtensions(m.current.ByExt, m.width))
@@ -259,13 +263,13 @@ func (m Model) View() string {
 	return sb.String()
 }
 
-// extEntry representa uma entrada de extensão para ordenação.
+// extEntry represents an extension entry for sorting.
 type extEntry struct {
 	name  string
 	lines int
 }
 
-// renderExtensions renderiza o grid de extensões em 2 colunas.
+// renderExtensions renders the extension grid in 2 columns.
 func renderExtensions(byExt map[string]int, width int) string {
 	if len(byExt) == 0 {
 		return ""
@@ -289,6 +293,11 @@ func renderExtensions(byExt map[string]int, width int) string {
 		entries = append(entries, *noExt)
 	}
 
+	const maxExtensions = 5
+	if len(entries) > maxExtensions {
+		entries = entries[:maxExtensions]
+	}
+
 	leftColWidth := (width - 1) / 2
 	rightColWidth := width - 1 - leftColWidth
 	const countWidth = 8
@@ -309,7 +318,7 @@ func renderExtensions(byExt map[string]int, width int) string {
 	return sb.String()
 }
 
-// formatExtEntry formata uma entrada de extensão para uma coluna.
+// formatExtEntry formats an extension entry for a column.
 func formatExtEntry(e extEntry, colWidth, countWidth int) string {
 	nameWidth := colWidth - countWidth - 1
 
@@ -325,7 +334,7 @@ func formatExtEntry(e extEntry, colWidth, countWidth int) string {
 	return nameStr + countStr
 }
 
-// formatNumber formata um inteiro com separador de milhar pt-BR (".").
+// formatNumber formats an integer with a pt-BR thousands separator (".").
 func formatNumber(n int) string {
 	s := fmt.Sprintf("%d", n)
 	if len(s) <= 3 {

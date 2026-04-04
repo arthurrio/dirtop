@@ -84,6 +84,8 @@ If no directory is given, the current working directory is used.
 
 | Flag | Default | Description |
 |------|---------|-------------|
+| `--dev` | `false` | Ignore common dependency, build, cache, IDE, VCS directories and generated files |
+| `--ignore-dirs <list>` | `""` | Additional directory names to ignore, comma-separated |
 | `-i <seconds>` | `1` | Starting refresh interval |
 | `--intervals <list>` | `1,5,10,30,60` | Available intervals to cycle through (comma-separated, in seconds) |
 
@@ -99,12 +101,21 @@ dirtop ~/code/myproject
 # Start with a 5-second interval
 dirtop -i 5
 
+# Ignore common dependency and IDE directories
+dirtop --dev
+
+# Ignore custom directories by name
+dirtop --ignore-dirs generated,coverage,tmp
+
 # Use a custom interval list
 dirtop --intervals 1,10,60
 
 # Combine flags and path
 dirtop -i 10 --intervals 1,10,60 ~/code/myproject
 ```
+
+With `--dev`, `dirtop` skips common development-only paths such as `node_modules`, `vendor`, `target`, `__pycache__`, `dist`, `build`, and generated files like `*.iml`, `*.class`, `*.so`, and `*.min.js.map`. Hidden directories (e.g. `.git`, `.idea`, `.vscode`) are always ignored regardless of `--dev`. Project config files such as `package.json`, `pom.xml`, `Cargo.toml`, and `tsconfig.json` are still counted.
+The full directory list ignored by `--dev` is defined in [scanner.go](scanner.go).
 
 ## Keyboard shortcuts
 
