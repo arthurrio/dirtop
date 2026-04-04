@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -29,17 +30,24 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Check access to the current directory before starting the TUI.
-	if _, err := os.ReadDir("."); err != nil {
-		fmt.Fprintf(os.Stderr, "error: cannot access current directory: %v\n", err)
+	// Resolve target directory from positional argument or cwd.
+	target := "."
+	if args := flag.Args(); len(args) > 0 {
+		target = args[0]
+	}
+
+	absPath, err := filepath.Abs(target)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: cannot resolve path %q: %v\n", target, err)
 		os.Exit(1)
 	}
 
-	// Resolve the absolute path for display.
-	cwd, err := os.Getwd()
-	if err != nil {
-		cwd = "."
+	if _, err := os.ReadDir(absPath); err != nil {
+		fmt.Fprintf(os.Stderr, "error: cannot access directory %q: %v\n", absPath, err)
+		os.Exit(1)
 	}
+
+	cwd := absPath
 
 	intervals := parseIntervals(*flagIntervals, *flagInterval)
 	intervalIdx := findIntervalIdx(intervals, *flagInterval)
