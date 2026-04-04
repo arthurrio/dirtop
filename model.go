@@ -17,6 +17,12 @@ type tickMsg time.Time
 
 const historyMaxLen = 3600
 
+// Snapshot records a Stats sample and the time it was observed.
+type Snapshot struct {
+	Stats
+	Time time.Time
+}
+
 // DefaultIntervals is the default list of refresh intervals.
 var DefaultIntervals = []time.Duration{
 	1 * time.Second,
@@ -41,7 +47,7 @@ var chartMetrics = [3]metricDef{
 
 // Model holds the Bubble Tea application state.
 type Model struct {
-	history     []Stats
+	history     []Snapshot
 	current     Stats
 	cwd         string
 	scanOpts    ScanOptions
@@ -75,6 +81,11 @@ func (m Model) metricValues() []int {
 		}
 	}
 	return vals
+}
+
+// statsChanged reports whether two Stats differ in the tracked metrics.
+func statsChanged(a, b Stats) bool {
+	return a.Files != b.Files || a.Dirs != b.Dirs || a.Lines != b.Lines
 }
 
 // formatInterval formats a duration as "1s", "30s", "1m", or "5m".
@@ -113,11 +124,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case ScanMsg:
 		stats := Stats(msg)
-		if len(m.history) >= historyMaxLen {
-			m.history = m.history[1:]
-		}
-		m.history = append(m.history, stats)
 		m.current = stats
+		isNew := len(m.history) == 0 || statsChanged(m.history[len(m.history)-1].Stats, stats)
+		if isNew {
+			if len(m.history) >= historyMaxLen {
+				m.history = m.history[1:]
+			}
+			m.history = append(m.history, Snapshot{Stats: stats, Time: time.Now()})
+		}
 		return m, tickCmd(m.interval())
 
 	case tea.WindowSizeMsg:
@@ -244,7 +258,11 @@ func (m Model) View() string {
 	case ChartDelta:
 		chartStr = RenderDelta(metricVals, m.width, chartHeight)
 	case ChartHorizBar:
-		chartStr = RenderHorizBar(metricVals, m.width, chartHeight, m.interval())
+		times := make([]time.Time, len(m.history))
+		for i, s := range m.history {
+			times[i] = s.Time
+		}
+		chartStr = RenderHorizBar(metricVals, times, m.width, chartHeight, time.Now())
 	default:
 		chartStr = Render(metricVals, m.width, chartHeight)
 	}
